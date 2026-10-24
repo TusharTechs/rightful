@@ -23,7 +23,8 @@ All of it is in the **sandbox**; nothing touches real money.
   - Advanced options → information requested: *PayPal account ID (payer ID)* and
     *account verification status*. Nothing else is needed.
 - [ ] **Transaction search** — on (needed for reconciliation).
-- [ ] **Vault / Save payment methods** — on, if offered (needed only for agent delegations).
+- [ ] **Vault / Save payment methods** — on (needed only for agent delegations). With it off, creating a
+      setup token fails with `403 NOT_AUTHORIZED` and the app token has no `vault/payment-tokens` scope.
 - [ ] **Payouts** — on, if shown.
 
 ## 4. Run the probes

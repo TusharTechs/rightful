@@ -60,7 +60,8 @@ const probes: Record<string, () => Promise<Omit<Finding, "probe" | "at">>> = {
         scopes,
         looksEnabled: {
           payouts: has("payments/payouts"),
-          vault: has("vault"),
+          // Legacy card-vault scopes are always present; wallet vaulting needs the payment-tokens scope.
+          vault: has("vault/payment-tokens"),
           transactionSearch: has("reporting/search"),
           identity: has("openid") || has("identity"),
           disputes: has("disputes"),
