@@ -23,6 +23,7 @@ advance, so anyone can recompute it.
 | `src/ballot/human.ts` | Per-ballot pseudonyms for payer IDs |
 | `scripts/probe.ts` | Day-0 sandbox probes (`npm run probe -- all`) |
 | `test/` | `node:test` suites (`npm test`) |
+| `docs/architecture.md` | Target Render service layout and the money flow; update it when a service lands |
 
 ## Rules
 
