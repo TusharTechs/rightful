@@ -75,8 +75,8 @@ export function verifyDraw(
   const expected = draw(terms, entries, beacon);
   const mismatches: DrawMismatch[] = [];
   const check = (field: string, a: unknown, b: unknown) => {
-    const left = JSON.stringify(a);
-    const right = JSON.stringify(b);
+    const left = canonical(a);
+    const right = canonical(b);
     if (left !== right) mismatches.push({ field, expected: left, published: right });
   };
   check("commitment", expected.commitment, published.commitment);
@@ -85,4 +85,13 @@ export function verifyDraw(
   check("line", expected.line, published.line);
   check("selectedUnits", expected.selectedUnits, published.selectedUnits);
   return mismatches;
+}
+
+/** JSON with sorted keys, so a result that went through a database (which may reorder keys) still compares equal. */
+function canonical(value: unknown): string {
+  return JSON.stringify(value, (_key, v: unknown) =>
+    v && typeof v === "object" && !Array.isArray(v)
+      ? Object.fromEntries(Object.entries(v as Record<string, unknown>).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
+      : v,
+  );
 }
