@@ -236,7 +236,7 @@ const probes: Record<string, () => Promise<Omit<Finding, "probe" | "at">>> = {
 
   async login() {
     const client = paypal();
-    const redirectUri = process.env.PAYPAL_LIPP_REDIRECT_URI ?? `${BASE}/callback`;
+    const redirectUri = process.env.PAYPAL_LIPP_REDIRECT_URI || `${BASE}/callback`;
     const state = randomUUID();
     const link = loginUrl({ clientId: client.clientId, redirectUri, state });
     const outcome = await waitForBuyer("Log in with PayPal as a sandbox Personal buyer", link, [new URL(redirectUri).pathname]);

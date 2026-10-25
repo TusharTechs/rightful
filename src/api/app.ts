@@ -10,6 +10,7 @@ import { timingSafeEqual } from "node:crypto";
 import { Hono, type Context } from "hono";
 import { timeOfRound } from "../ballot/drand.ts";
 import { PayPalError } from "../paypal/client.ts";
+import { type LoginConfig, mountLogin } from "./login.ts";
 import {
   type Deps,
   type EntryRow,
@@ -26,8 +27,9 @@ import {
   startEntry,
 } from "../ballots/service.ts";
 
-export function createApp(deps: Deps, options: { adminToken: string }) {
+export function createApp(deps: Deps, options: { adminToken: string; login?: LoginConfig }) {
   const app = new Hono();
+  if (options.login) mountLogin(app, options.login, () => deps.now().getTime());
 
   app.onError((err, c) => {
     if (err instanceof BallotError) {

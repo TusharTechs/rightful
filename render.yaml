@@ -1,0 +1,59 @@
+# Firsthand on Render. One Blueprint provisions everything. Services are added here as they are
+# built; docs/architecture.md shows the target layout and why each piece is separate.
+projects:
+  - name: firsthand
+    environments:
+      - name: production
+        envVarGroups:
+          # Generated once on first deploy and shared by every service that needs them.
+          - name: firsthand-secrets
+            envVars:
+              - key: HUMAN_TAG_SECRET
+                generateValue: true
+              - key: ADMIN_TOKEN
+                generateValue: true
+
+        databases:
+          # The ledger. A paid plan, because free databases are deleted after 30 days and judging
+          # runs into mid-December.
+          - name: firsthand-db
+            databaseName: firsthand
+            user: firsthand
+            plan: 0.1c-256mb
+            region: oregon
+            postgresMajorVersion: "18"
+            # Private network only: nothing outside Render can connect.
+            ipAllowList: []
+
+        services:
+          # Public API: REST, PayPal return and Log in with PayPal callbacks. Always on, so judges
+          # never hit a cold start. Builds run the type checker and the test suite; a failing build
+          # never deploys, and the pre-deploy migration runs before any new instance takes traffic.
+          - type: web
+            name: firsthand-api
+            runtime: node
+            plan: 0.5c-512mb
+            region: oregon
+            branch: main
+            autoDeployTrigger: commit
+            buildCommand: npm ci --include=dev && npm run typecheck && npm test
+            preDeployCommand: npm run migrate
+            startCommand: npm start
+            healthCheckPath: /health
+            envVars:
+              - key: NODE_VERSION
+                value: "22"
+              - key: NODE_ENV
+                value: production
+              - key: PAYPAL_ENV
+                value: sandbox
+              # Prompted once in the Dashboard when the Blueprint is first applied.
+              - key: PAYPAL_CLIENT_ID
+                sync: false
+              - key: PAYPAL_CLIENT_SECRET
+                sync: false
+              - fromGroup: firsthand-secrets
+              - key: DATABASE_URL
+                fromDatabase:
+                  name: firsthand-db
+                  property: connectionString

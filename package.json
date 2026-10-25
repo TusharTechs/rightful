@@ -9,6 +9,8 @@
     "node": ">=22"
   },
   "scripts": {
+    "start": "tsx src/api/main.ts",
+    "migrate": "tsx scripts/migrate.ts",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test \"test/**/*.test.ts\"",
     "probe": "tsx --env-file-if-exists=.env scripts/probe.ts",
