@@ -75,6 +75,7 @@ export type EntryRow = {
   human_tag: string | null;
   account_status: string | null;
   last_error: string | null;
+  return_to: string | null;
 };
 
 export class BallotError extends Error {
@@ -135,8 +136,16 @@ export async function createBallot(deps: Deps, input: NewBallot): Promise<Ballot
   return row!;
 }
 
-/** Step 1 of entering: create the hold and hand back the PayPal approval link. */
-export async function startEntry(deps: Deps, ballotId: string, quantity: number): Promise<{ entry: EntryRow; approveUrl: string }> {
+/**
+ * Step 1 of entering: create the hold and hand back the PayPal approval link. `returnTo` is the
+ * origin of the app the fan came from; the caller must have checked it against an allowlist.
+ */
+export async function startEntry(
+  deps: Deps,
+  ballotId: string,
+  quantity: number,
+  returnTo?: string,
+): Promise<{ entry: EntryRow; approveUrl: string }> {
   const ballot = await getBallot(deps.db, ballotId);
   assertOpen(deps, ballot);
   if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > ballot.max_quantity) {
@@ -146,8 +155,8 @@ export async function startEntry(deps: Deps, ballotId: string, quantity: number)
   const id = newId("ent");
   const holdCents = ballot.price_cents * quantity;
   await deps.db.query(
-    `insert into entries (id, ballot_id, quantity, hold_cents, status) values ($1, $2, $3, $4, 'awaiting_approval')`,
-    [id, ballot.id, quantity, holdCents],
+    `insert into entries (id, ballot_id, quantity, hold_cents, status, return_to) values ($1, $2, $3, $4, 'awaiting_approval', $5)`,
+    [id, ballot.id, quantity, holdCents, returnTo ?? null],
   );
 
   const { orderId, approveUrl } = await deps.paypal.createHold(

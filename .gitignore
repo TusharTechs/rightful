@@ -10,3 +10,4 @@ research/
 notes/
 *.research.md
 .data/
+web/dist/

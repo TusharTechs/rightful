@@ -8,9 +8,13 @@
 
 import { timingSafeEqual } from "node:crypto";
 import { Hono, type Context } from "hono";
+import { cors } from "hono/cors";
 import { timeOfRound } from "../ballot/drand.ts";
 import { PayPalError } from "../paypal/client.ts";
 import { type LoginConfig, mountLogin } from "./login.ts";
+import { advance } from "../ballots/clock.ts";
+import type { FakePayPal } from "../dev/fake-paypal.ts";
+import { mountFakePayPal } from "../dev/fake-paypal-routes.ts";
 import {
   type Deps,
   type EntryRow,
@@ -27,9 +31,25 @@ import {
   startEntry,
 } from "../ballots/service.ts";
 
-export function createApp(deps: Deps, options: { adminToken: string; login?: LoginConfig }) {
+export type AppOptions = {
+  adminToken: string;
+  login?: LoginConfig;
+  /** Origins the web app may ask PayPal to send fans back to. Anything else falls back to API pages. */
+  webOrigins?: (string | RegExp)[];
+  /** Local development only: serve a stand-in PayPal approval page. */
+  fakePayPal?: FakePayPal;
+};
+
+export function createApp(deps: Deps, options: AppOptions) {
   const app = new Hono();
   if (options.login) mountLogin(app, options.login, () => deps.now().getTime());
+  if (options.fakePayPal) mountFakePayPal(app, options.fakePayPal);
+  // The API uses no cookies outside /auth, so any origin may read public data and create entries.
+  app.use("/api/*", cors({ origin: "*", allowHeaders: ["content-type", "authorization"], allowMethods: ["GET", "POST"] }));
+  const allowedReturn = (origin: unknown): string | undefined =>
+    typeof origin === "string" && (options.webOrigins ?? []).some((rule) => (typeof rule === "string" ? rule === origin : rule.test(origin)))
+      ? origin
+      : undefined;
 
   app.onError((err, c) => {
     if (err instanceof BallotError) {
@@ -72,11 +92,39 @@ export function createApp(deps: Deps, options: { adminToken: string; login?: Log
     return c.json(await ballotView(deps, ballot.id), 201);
   });
 
-  app.get("/api/ballots/:id", async (c) => c.json(await ballotView(deps, param(c))));
+  app.get("/api/ballots", async (c) => {
+    const rows = await deps.db.query<{ id: string }>(
+      `select id from ballots where status <> 'cancelled' order by created_at desc limit 20`,
+    );
+    return c.json(await Promise.all(rows.map((row) => ballotView(deps, row.id))));
+  });
+
+  // Someone is watching this ballot: run any step that is due now rather than waiting for the cron
+  // tick. Sealing and drawing are quick and awaited; settling calls PayPal, so it runs behind.
+  const settling = new Set<string>();
+  const advanceWhileWatching = async (id: string) => {
+    try {
+      await advance(deps, id, { settle: false });
+      const ballot = await getBallot(deps.db, id);
+      if (ballot.status === "drawn" && !settling.has(id)) {
+        settling.add(id);
+        settleBallot(deps, id)
+          .catch((err) => console.error(`settle ${id}:`, err))
+          .finally(() => settling.delete(id));
+      }
+    } catch (err) {
+      if (!(err instanceof BallotError && err.code === "not_found")) console.error(`advance ${id}:`, err);
+    }
+  };
+
+  app.get("/api/ballots/:id", async (c) => {
+    await advanceWhileWatching(param(c));
+    return c.json(await ballotView(deps, param(c)));
+  });
 
   app.post("/api/ballots/:id/entries", async (c) => {
-    const body = await c.req.json<{ quantity?: number }>().catch(() => ({}) as { quantity?: number });
-    const { entry, approveUrl } = await startEntry(deps, param(c), Number(body.quantity ?? 1));
+    const body = await c.req.json<{ quantity?: number; returnTo?: string }>().catch(() => ({}) as { quantity?: number; returnTo?: string });
+    const { entry, approveUrl } = await startEntry(deps, param(c), Number(body.quantity ?? 1), allowedReturn(body.returnTo));
     return c.json({ entryId: entry.id, holdCents: entry.hold_cents, approveUrl }, 201);
   });
 
@@ -100,6 +148,7 @@ export function createApp(deps: Deps, options: { adminToken: string; login?: Log
   // PayPal sends the fan back here after they approve (or cancel) the hold.
   app.get("/paypal/return", async (c) => {
     const entry = await completeEntry(deps, c.req.query("entry") ?? "");
+    if (entry.return_to && allowedReturn(entry.return_to)) return c.redirect(`${entry.return_to}/e/${entry.id}`, 303);
     const message =
       entry.status === "held"
         ? "You're in. Your hold is placed; you are charged only if you are selected."
@@ -115,6 +164,7 @@ export function createApp(deps: Deps, options: { adminToken: string; login?: Log
 
   app.get("/paypal/cancel", async (c) => {
     const entry = await cancelEntry(deps, c.req.query("entry") ?? "");
+    if (entry.return_to && allowedReturn(entry.return_to)) return c.redirect(`${entry.return_to}/b/${entry.ballot_id}?cancelled=1`, 303);
     return c.html(page("Firsthand", "You cancelled. Nothing was held.", entry.id));
   });
 
@@ -141,6 +191,7 @@ async function ballotView(deps: Deps, id: string) {
     drawRound: round,
     drawRoundFixed: ballot.draw_round !== null,
     drawAt: timeOfRound(round),
+    serverTime: deps.now(),
     commitment: ballot.commitment_digest,
     entries: Object.fromEntries(counts.map((row) => [row.status, row.n])),
   };

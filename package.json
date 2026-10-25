@@ -15,7 +15,12 @@
     "test": "tsx --test \"test/**/*.test.ts\"",
     "probe": "tsx --env-file-if-exists=.env scripts/probe.ts",
     "dev:api": "tsx --env-file-if-exists=.env src/api/main.ts",
-    "demo:ballot": "tsx --env-file-if-exists=.env scripts/demo-ballot.ts"
+    "demo:ballot": "tsx --env-file-if-exists=.env scripts/demo-ballot.ts",
+    "clock": "tsx scripts/clock.ts",
+    "dev:web": "vite",
+    "build:web": "vite build",
+    "preview:web": "vite preview",
+    "dev:api:fake": "PAYPAL_MODE=fake ADMIN_TOKEN=dev-admin-token tsx src/api/main.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.11",
@@ -24,12 +29,18 @@
     "@typesafe-ai/sdk": "^0.7.0",
     "drand-client": "^1.4.2",
     "hono": "^4.13.13",
-    "pg": "^8.23.1"
+    "pg": "^8.23.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",
     "@types/pg": "^8.23.1",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
     "tsx": "^4.23.15",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5"
   }
 }

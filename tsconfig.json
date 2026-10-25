@@ -10,8 +10,9 @@
     "allowImportingTsExtensions": true,
     "noEmit": true,
     "skipLibCheck": true,
-    "types": ["node"],
-    "lib": ["es2023", "dom"]
+    "jsx": "react-jsx",
+    "types": ["node", "vite/client"],
+    "lib": ["es2023", "dom", "dom.iterable"]
   },
-  "include": ["src", "scripts", "test"]
+  "include": ["src", "scripts", "test", "web/src", "vite.config.ts"]
 }

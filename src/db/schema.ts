@@ -50,6 +50,9 @@ create table if not exists entries (
   updated_at        timestamptz not null default now()
 );
 
+-- Where to send the fan after PayPal: the web app's origin, checked against an allowlist.
+alter table entries add column if not exists return_to text;
+
 create index if not exists entries_by_ballot on entries (ballot_id, status);
 
 -- One verified human, one live entry per ballot. Rejected and cancelled entries do not count.

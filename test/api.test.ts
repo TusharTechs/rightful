@@ -5,7 +5,7 @@ import { createApp } from "../src/api/app.ts";
 import { timeOfRound } from "../src/ballot/drand.ts";
 import { openPGlite } from "../src/db/db.ts";
 import type { Deps } from "../src/ballots/service.ts";
-import { FakePayPal } from "./fake-paypal.ts";
+import { FakePayPal } from "../src/dev/fake-paypal.ts";
 
 async function setup() {
   const paypal = new FakePayPal();
@@ -22,6 +22,46 @@ async function setup() {
   const asAdmin = { authorization: "Bearer admin-secret", "content-type": "application/json" };
   return { app, paypal, clock, asAdmin };
 }
+
+test("PayPal sends fans back to the web app only if its origin is allowed", async () => {
+  const paypal = new FakePayPal();
+  const deps: Deps = {
+    db: await openPGlite(),
+    paypal,
+    humanSecret: new Uint8Array(32).fill(8),
+    beacon: async (round) => ({ round, randomness: "0".repeat(64), signature: "sig" }),
+    now: () => new Date("2026-11-01T18:00:00Z"),
+    returnBase: "http://localhost:8787/paypal",
+  };
+  const app = createApp(deps, { adminToken: "t", webOrigins: [/^https:\/\/firsthand-web(-[a-z0-9-]+)?\.onrender\.com$/] });
+  const created = await app.request("/api/ballots", {
+    method: "POST",
+    headers: { authorization: "Bearer t", "content-type": "application/json" },
+    body: JSON.stringify({ title: "Redirects", priceCents: 100, inventory: 1, closesInSeconds: 60 }),
+  });
+  const { id } = (await created.json()) as { id: string };
+
+  for (const [returnTo, expected] of [
+    ["https://firsthand-web.onrender.com", "https://firsthand-web.onrender.com/e/"],
+    ["https://firsthand-web-pr-7.onrender.com", "https://firsthand-web-pr-7.onrender.com/e/"],
+    ["https://evil.example", null],
+  ] as const) {
+    const started = await app.request(`/api/ballots/${id}/entries`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ quantity: 1, returnTo }),
+    });
+    const { entryId, approveUrl } = (await started.json()) as { entryId: string; approveUrl: string };
+    paypal.approve(new URL(approveUrl).searchParams.get("token")!, { payerId: `P_${returnTo}` });
+    const back = await app.request(`/paypal/return?entry=${entryId}`);
+    if (expected) {
+      assert.equal(back.status, 303);
+      assert.equal(back.headers.get("location"), `${expected}${entryId}`);
+    } else {
+      assert.equal(back.status, 200, "an unknown origin gets the API's own page, never a redirect");
+    }
+  }
+});
 
 test("organizer actions need the admin token", async () => {
   const { app } = await setup();

@@ -24,9 +24,13 @@ advance, so anyone can recompute it.
 | `src/db/` | One `Db` interface over Postgres (`DATABASE_URL`) and PGlite (local, tests); `schema.ts` is the ledger |
 | `src/ballots/service.ts` | The lifecycle: create, enter (authorize + verify + one per human), seal, draw, settle, proofs |
 | `src/ballots/paypal-port.ts` | The PayPal slice the service uses; `test/fake-paypal.ts` implements it with idempotent replays |
-| `src/api/` | Hono app (`app.ts`) and server (`main.ts`): REST, PayPal return/cancel pages, admin actions |
+| `src/api/` | Hono app (`app.ts`) and server (`main.ts`): REST, PayPal return/cancel, Log in with PayPal (`login.ts`), admin actions |
+| `src/ballots/clock.ts` | `tick` (cron job) and `advance` (when a ballot is being watched): seal, draw, settle on time |
+| `src/dev/` | `PAYPAL_MODE=fake` only: the in-memory PayPal and its stand-in approval page. Refused in production |
+| `web/` | Fan app (Vite + React): ballot page, enter with PayPal, live draw, receipts. Imports `src/ballot/*` to verify proofs and the draw in the browser; never import server code into it |
 | `scripts/probe.ts` | Day-0 sandbox probes (`npm run probe -- all`) |
 | `scripts/demo-ballot.ts` | A real ballot on the sandbox, end to end (`npm run demo:ballot`) |
+| `scripts/clock.ts`, `scripts/migrate.ts` | Render cron job (one tick) and pre-deploy migration |
 | `test/` | `node:test` suites (`npm test`) |
 | `docs/architecture.md` | Target Render service layout and the money flow; update it when a service lands |
 

@@ -1,14 +1,24 @@
 /**
- * An in-memory PayPal that behaves like the real one where it matters for money safety:
+ * An in-memory PayPal for tests and local UI work (`PAYPAL_MODE=fake`, never in production). It
+ * behaves like the real one where it matters for money safety:
  * idempotency keys replay the first result, captured and voided authorizations refuse further
  * changes, and a call can be made to "succeed at PayPal but lose the response" to simulate a crash.
  */
 
-import { PayPalError } from "../src/paypal/client.ts";
-import type { AuthorizationStatus } from "../src/paypal/orders.ts";
-import type { Approval, PayPalPort } from "../src/ballots/paypal-port.ts";
+import { PayPalError } from "../paypal/client.ts";
+import type { AuthorizationStatus } from "../paypal/orders.ts";
+import type { Approval, PayPalPort } from "../ballots/paypal-port.ts";
 
-type FakeOrder = { id: string; status: "PAYER_ACTION_REQUIRED" | "APPROVED" | "COMPLETED"; amountCents: number; payerId?: string; accountStatus?: "VERIFIED" | "UNVERIFIED"; authorizationId?: string };
+type FakeOrder = {
+  id: string;
+  status: "PAYER_ACTION_REQUIRED" | "APPROVED" | "COMPLETED";
+  amountCents: number;
+  returnUrl?: string;
+  cancelUrl?: string;
+  payerId?: string;
+  accountStatus?: "VERIFIED" | "UNVERIFIED";
+  authorizationId?: string;
+};
 type FakeAuthorization = { id: string; orderId: string; status: AuthorizationStatus; amountCents: number; capturedCents: number };
 
 export class FakePayPal implements PayPalPort {
@@ -21,6 +31,9 @@ export class FakePayPal implements PayPalPort {
   private replays = new Map<string, unknown>();
   private counter = 0;
 
+  /** `approveBase` is where approval links point (the dev approval page); tests can ignore it. */
+  constructor(private readonly approveBase = "https://sandbox.example/checkoutnow") {}
+
   /** What the buyer does in the PayPal popup. */
   approve(orderId: string, payer: { payerId: string; accountStatus?: "VERIFIED" | "UNVERIFIED" }) {
     const order = this.orders.get(orderId)!;
@@ -29,12 +42,12 @@ export class FakePayPal implements PayPalPort {
     order.accountStatus = payer.accountStatus ?? "VERIFIED";
   }
 
-  async createHold(hold: { referenceId: string; amountCents: number }, key: string) {
+  async createHold(hold: { referenceId: string; amountCents: number; returnUrl?: string; cancelUrl?: string }, key: string) {
     return this.once(key, () => {
       const id = this.nextId("ORDER");
-      this.orders.set(id, { id, status: "PAYER_ACTION_REQUIRED", amountCents: hold.amountCents });
+      this.orders.set(id, { id, status: "PAYER_ACTION_REQUIRED", amountCents: hold.amountCents, returnUrl: hold.returnUrl, cancelUrl: hold.cancelUrl });
       this.applied.push({ op: "create", target: id, amountCents: hold.amountCents });
-      return { orderId: id, approveUrl: `https://sandbox.example/checkoutnow?token=${id}` };
+      return { orderId: id, approveUrl: `${this.approveBase}?token=${id}` };
     });
   }
 

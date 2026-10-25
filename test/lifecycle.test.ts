@@ -18,7 +18,7 @@ import {
   settleBallot,
   startEntry,
 } from "../src/ballots/service.ts";
-import { FakePayPal } from "./fake-paypal.ts";
+import { FakePayPal } from "../src/dev/fake-paypal.ts";
 
 const START = new Date("2026-11-01T18:00:00Z");
 const PRICE = 2500;

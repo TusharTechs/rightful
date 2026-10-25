@@ -23,11 +23,11 @@ reasons. Pieces marked *(planned)* are not built yet.
 
 | Service | Type | Job | Why it is separate |
 |---|---|---|---|
-| `firsthand-web` *(planned)* | Static site, PR previews | Fan PWA, organizer console, public audit pages | No server needed; every PR gets a preview |
+| `firsthand-web` *(in render.yaml)* | Static site, PR previews | Fan app: ballot page, PayPal entry, live draw, receipts; verifies proofs and the draw in the browser | No server needed; every PR gets a preview |
 | `firsthand-api` *(in render.yaml)* | Web service | REST API, PayPal return pages, Log in with PayPal callback; next: webhook receiver, MCP gateway for fan agents, SSE updates | The only public backend, kept free of long jobs |
 | `firsthand-gate` *(planned)* | Background worker | Reads the entry queue, screens each entry, writes telemetry | Keeps up with a bot storm without slowing the API |
 | `firsthand-workflows` *(planned)* | Render Workflows (TypeScript SDK) | Durable money and AI tasks with retries; one subtask per capture or void | Settlement must survive crashes; retries reuse PayPal idempotency keys, so a replayed task never charges twice |
-| `firsthand-clock` *(planned)* | Cron job | Starts draws, sweeps holds near PayPal's 3-day honour period, reconciles nightly | Workflows do not schedule themselves |
+| `firsthand-clock` *(in render.yaml)* | Cron job, every minute | Seals closed ballots, draws once the round is out, settles; next: hold reauthorization sweep, nightly reconciliation | The backstop for ballots nobody is watching (the API advances watched ballots immediately) |
 | `firsthand-db` *(in render.yaml)* | Postgres, private network only | Source of truth for money state, plus an append-only audit log | Durable, relational, easy to reconcile against PayPal |
 | `firsthand-kv` *(planned)* | Key Value | Entry queue, rate limits, idempotency locks, pub/sub | Low-latency state shared by the API and the gate |
 

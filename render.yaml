@@ -57,3 +57,68 @@ projects:
                 fromDatabase:
                   name: firsthand-db
                   property: connectionString
+
+          # Fan app: static files only, so it needs no server. Every pull request gets its own
+          # preview site, which the API already accepts as a return address
+          # (firsthand-web-pr-N.onrender.com). The API URL is baked in at build time; the API never
+          # references this service, so there is no dependency cycle.
+          - type: web
+            name: firsthand-web
+            runtime: static
+            buildCommand: npm ci --include=dev && npm run build:web
+            staticPublishPath: web/dist
+            pullRequestPreviewsEnabled: true
+            routes:
+              - type: rewrite
+                source: /*
+                destination: /index.html
+            headers:
+              - path: /*
+                name: X-Frame-Options
+                value: DENY
+              - path: /*
+                name: Referrer-Policy
+                value: strict-origin-when-cross-origin
+            envVars:
+              - key: NODE_VERSION
+                value: "22"
+              - key: VITE_API_URL
+                fromService:
+                  name: firsthand-api
+                  type: web
+                  envVarKey: RENDER_EXTERNAL_URL
+
+          # The clock: every minute, seal ballots whose entries closed, draw ballots whose drand
+          # round is out, and settle drawn ballots. The API also advances a ballot the moment someone
+          # is watching it; this job is the backstop, so nothing waits on a visitor. Every step is
+          # idempotent, so the two overlapping is safe.
+          - type: cron
+            name: firsthand-clock
+            runtime: node
+            region: oregon
+            schedule: "* * * * *"
+            buildCommand: npm ci --include=dev
+            startCommand: npm run clock
+            envVars:
+              - key: NODE_VERSION
+                value: "22"
+              - key: NODE_ENV
+                value: production
+              - key: PAYPAL_ENV
+                value: sandbox
+              # Same PayPal app as the API, read from it so the secret is entered only once.
+              - key: PAYPAL_CLIENT_ID
+                fromService:
+                  name: firsthand-api
+                  type: web
+                  envVarKey: PAYPAL_CLIENT_ID
+              - key: PAYPAL_CLIENT_SECRET
+                fromService:
+                  name: firsthand-api
+                  type: web
+                  envVarKey: PAYPAL_CLIENT_SECRET
+              - fromGroup: firsthand-secrets
+              - key: DATABASE_URL
+                fromDatabase:
+                  name: firsthand-db
+                  property: connectionString
