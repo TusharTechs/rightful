@@ -18,10 +18,16 @@ All of it is in the **sandbox**; nothing touches real money.
 
 ## 3. App features (the app's settings page; save, then allow 10–15 minutes)
 
-- [ ] **Log in with PayPal** — turn it on **today**: participants report it can take up to 7 days.
-  - Return URL: `http://localhost:5174/callback` (must match `PAYPAL_LIPP_REDIRECT_URI`).
+- [ ] **Log in with PayPal** — turn it on early: Return URL changes take up to three hours to apply.
+  - Return URL: a **public HTTPS** URL ending in `/callback`, matching `PAYPAL_LIPP_REDIRECT_URI`.
+    PayPal will not save `http://localhost` (the dashboard answers "Something went wrong saving the
+    application"). Use the deployed API's URL, or a stable tunnel to `localhost:5174` (e.g. an ngrok
+    static domain) for local testing.
   - Advanced options → information requested: *PayPal account ID (payer ID)* and
     *account verification status*. Nothing else is needed.
+  - Privacy policy URL and User agreement URL are required. In the sandbox, `https://example.com` works;
+    replace them with real pages before any live use.
+  - Not a blocker: the approved hold order already carries `account_status` and the payer ID.
 - [ ] **Transaction search** — on (needed for reconciliation).
 - [ ] **Vault / Save payment methods** — on (needed only for agent delegations). With it off, creating a
       setup token fails with `403 NOT_AUTHORIZED` and the app token has no `vault/payment-tokens` scope.
