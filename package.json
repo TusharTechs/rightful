@@ -11,7 +11,9 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "tsx --test \"test/**/*.test.ts\"",
-    "probe": "tsx --env-file-if-exists=.env scripts/probe.ts"
+    "probe": "tsx --env-file-if-exists=.env scripts/probe.ts",
+    "dev:api": "tsx --env-file-if-exists=.env src/api/main.ts",
+    "demo:ballot": "tsx --env-file-if-exists=.env scripts/demo-ballot.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.11",

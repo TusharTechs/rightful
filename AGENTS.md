@@ -21,7 +21,12 @@ advance, so anyone can recompute it.
 | `src/ballot/draw.ts` | The draw and its verifier (pure functions) |
 | `src/ballot/drand.ts` | Pinned quicknet chain info, verified beacon fetch, round ↔ time |
 | `src/ballot/human.ts` | Per-ballot pseudonyms for payer IDs |
+| `src/db/` | One `Db` interface over Postgres (`DATABASE_URL`) and PGlite (local, tests); `schema.ts` is the ledger |
+| `src/ballots/service.ts` | The lifecycle: create, enter (authorize + verify + one per human), seal, draw, settle, proofs |
+| `src/ballots/paypal-port.ts` | The PayPal slice the service uses; `test/fake-paypal.ts` implements it with idempotent replays |
+| `src/api/` | Hono app (`app.ts`) and server (`main.ts`): REST, PayPal return/cancel pages, admin actions |
 | `scripts/probe.ts` | Day-0 sandbox probes (`npm run probe -- all`) |
+| `scripts/demo-ballot.ts` | A real ballot on the sandbox, end to end (`npm run demo:ballot`) |
 | `test/` | `node:test` suites (`npm test`) |
 | `docs/architecture.md` | Target Render service layout and the money flow; update it when a service lands |
 

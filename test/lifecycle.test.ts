@@ -206,6 +206,16 @@ test("completing an entry twice authorizes once", async () => {
   assert.equal(w.paypal.applied.filter((a) => a.op === "authorize").length, 1);
 });
 
+test("closing early draws from a round a few seconds out, not the planned one", async () => {
+  const w = await world();
+  const ballot = await openBallot(w, { closesAt: new Date(START.getTime() + 30 * 60_000) });
+  await w.enter(ballot.id, "EARLY");
+  const sealed = await sealBallot(w.deps, ballot.id, { early: true });
+  const wait = timeOfRound(sealed.draw_round!).getTime() - w.clock.now.getTime();
+  assert.ok(wait > 0 && wait <= 15_000, `draw ${wait} ms after an early close`);
+  assert.ok(sealed.draw_round! < ballot.planned_round);
+});
+
 test("sealing late moves the deciding round forward so it is never already public", async () => {
   const w = await world();
   const ballot = await openBallot(w);

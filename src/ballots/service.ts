@@ -230,7 +230,9 @@ export async function cancelEntry(deps: Deps, entryId: string): Promise<EntryRow
 
 /**
  * Closes entries and commits the list. The deciding round is the planned one, or a later one if
- * sealing runs late, so that it is always unpublished at the moment of commitment.
+ * sealing runs late, so that it is always unpublished at the moment of commitment. An organizer who
+ * closes early gets a round a few seconds out instead of waiting for the planned one: nobody can
+ * know a future round's randomness, so choosing when to seal gives no advantage.
  */
 export async function sealBallot(deps: Deps, ballotId: string, options: { early?: boolean } = {}): Promise<BallotRow> {
   return deps.db.transaction(async (tx) => {
@@ -239,7 +241,8 @@ export async function sealBallot(deps: Deps, ballotId: string, options: { early?
     const now = deps.now();
     if (!options.early && now < ballot.closes_at) throw new BallotError("entries are still open", "too_early");
 
-    const round = Math.max(ballot.planned_round, roundAtOrAfter(new Date(now.getTime() + SEAL_TO_ROUND_MS)));
+    const soonest = roundAtOrAfter(new Date(now.getTime() + SEAL_TO_ROUND_MS));
+    const round = now < ballot.closes_at ? soonest : Math.max(ballot.planned_round, soonest);
     const entries = await heldEntries(tx, ballot.id);
     const commitment = commit(termsOf(ballot, round), entries.map(publicEntry));
 

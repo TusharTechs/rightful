@@ -5,8 +5,8 @@
 Fair, bot-proof ballots for anything scarce: concert tickets, limited drops, popular classes.
 Built on PayPal.
 
-> Status: day 0 of the build. The ballot engine and the PayPal sandbox client work and are tested;
-> the fan app, organizer console and agent gateway are next.
+> Status: day 1 of the build. A full ballot (enter, seal, draw, settle) runs on the PayPal sandbox
+> through the API; the fan app, organizer console and agent gateway are next.
 
 ## The idea
 
@@ -30,7 +30,17 @@ npm run probe -- drand
 The drand probe fetches a live quicknet beacon, verifies its BLS signature against the pinned chain
 key, and runs a 10,000-entry draw over it.
 
-To probe your own PayPal sandbox app, follow [docs/day0-sandbox-setup.md](docs/day0-sandbox-setup.md).
+With a PayPal sandbox app set up ([docs/day0-sandbox-setup.md](docs/day0-sandbox-setup.md)):
+
+```bash
+npm run demo:ballot -- 3 2   # 3 fans, 2 seats, on the real sandbox
+npm run dev:api              # the API on http://localhost:8787
+```
+
+The demo prints one PayPal approval link per fan. Approve each as a different sandbox Personal account
+(use "Not you?" on PayPal's page to switch). It then seals the list, waits for the drand round, draws,
+captures the selected holds, voids the rest, reads every hold back from PayPal and re-verifies the draw.
+No database to install: without `DATABASE_URL` it runs Postgres in-process (PGlite).
 
 ## License
 
