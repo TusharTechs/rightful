@@ -57,6 +57,9 @@ projects:
                 fromDatabase:
                   name: firsthand-db
                   property: connectionString
+              # The fan app's exact address: the only place PayPal returns fans to (comma-separated).
+              - key: WEB_ORIGINS
+                value: https://firsthand-web-zzfq.onrender.com
 
           # Fan app: static files only, so it needs no server. The API URL is baked in at build
           # time. The API trusts this site's exact address through WEB_ORIGINS (set on the API),
