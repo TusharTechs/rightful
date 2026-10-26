@@ -65,10 +65,10 @@ export async function startServer(env: NodeJS.ProcessEnv = process.env, options:
   const redirectUri = !paypal
     ? undefined
     : env.PAYPAL_LIPP_REDIRECT_URI || (publicBase.startsWith("https://") ? `${publicBase}/auth/paypal/callback` : undefined);
+  // Exact origins only. A pattern such as "firsthand-web*.onrender.com" would trust names anyone can
+  // register on Render, so the fan app's real address is configured explicitly.
   const webOrigins: (string | RegExp)[] = [
-    ...(env.WEB_ORIGINS ?? "").split(",").map((o) => o.trim()).filter(Boolean),
-    // Render static sites, including pull-request previews (firsthand-web-pr-12.onrender.com).
-    /^https:\/\/firsthand-web(-[a-z0-9-]+)?\.onrender\.com$/,
+    ...(env.WEB_ORIGINS ?? "").split(",").map((o) => o.trim().replace(/\/$/, "")).filter(Boolean),
     ...(production ? [] : [/^http:\/\/(localhost|127\.0\.0\.1):\d+$/]),
   ];
   const app = createApp(deps, {

@@ -33,7 +33,7 @@ test("PayPal sends fans back to the web app only if its origin is allowed", asyn
     now: () => new Date("2026-11-01T18:00:00Z"),
     returnBase: "http://localhost:8787/paypal",
   };
-  const app = createApp(deps, { adminToken: "t", webOrigins: [/^https:\/\/firsthand-web(-[a-z0-9-]+)?\.onrender\.com$/] });
+  const app = createApp(deps, { adminToken: "t", webOrigins: ["https://firsthand-web-ab12.onrender.com"] });
   const created = await app.request("/api/ballots", {
     method: "POST",
     headers: { authorization: "Bearer t", "content-type": "application/json" },
@@ -42,8 +42,10 @@ test("PayPal sends fans back to the web app only if its origin is allowed", asyn
   const { id } = (await created.json()) as { id: string };
 
   for (const [returnTo, expected] of [
-    ["https://firsthand-web.onrender.com", "https://firsthand-web.onrender.com/e/"],
-    ["https://firsthand-web-pr-7.onrender.com", "https://firsthand-web-pr-7.onrender.com/e/"],
+    ["https://firsthand-web-ab12.onrender.com", "https://firsthand-web-ab12.onrender.com/e/"],
+    // Look-alike names anyone could register on Render are not trusted.
+    ["https://firsthand-web.onrender.com", null],
+    ["https://firsthand-web-ab12-evil.onrender.com", null],
     ["https://evil.example", null],
   ] as const) {
     const started = await app.request(`/api/ballots/${id}/entries`, {

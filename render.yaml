@@ -58,10 +58,9 @@ projects:
                   name: firsthand-db
                   property: connectionString
 
-          # Fan app: static files only, so it needs no server. Every pull request gets its own
-          # preview site, which the API already accepts as a return address
-          # (firsthand-web-pr-N.onrender.com). The API URL is baked in at build time; the API never
-          # references this service, so there is no dependency cycle.
+          # Fan app: static files only, so it needs no server. The API URL is baked in at build
+          # time. The API trusts this site's exact address through WEB_ORIGINS (set on the API),
+          # never a name pattern, and never references this service, so there is no dependency cycle.
           - type: web
             name: firsthand-web
             runtime: static
