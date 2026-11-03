@@ -17,6 +17,7 @@ import type { Db } from "../db/db.ts";
 import { humanTag } from "../ballot/human.ts";
 import { isUniqueViolation } from "../ballots/service.ts";
 import { findRings, type Ring } from "../rings/cluster.ts";
+import type { PayoutsPort } from "./payouts-port.ts";
 import { type ClaimPass, claimKeys, issuePass, readPass, sealPayee } from "./pass.ts";
 
 export type ClaimsDeps = {
@@ -24,6 +25,8 @@ export type ClaimsDeps = {
   /** Server secret behind human tags, claim passes and sealed payees (≥ 32 bytes). */
   humanSecret: Uint8Array;
   now: () => Date;
+  /** Needed only to distribute. */
+  payouts?: PayoutsPort;
 };
 
 export type ProgramStatus = "open" | "review" | "distributing" | "done";
@@ -38,6 +41,8 @@ export type ProgramRow = {
   require_verified: boolean;
   sample_text: string;
   closes_at: Date;
+  share_cents: number | null;
+  payout_batches: Array<{ senderBatchId: string; batchId: string | null }>;
 };
 
 export type ClaimRow = {

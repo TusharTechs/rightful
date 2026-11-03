@@ -7,12 +7,15 @@ import { createHash, randomBytes } from "node:crypto";
 import { serve } from "@hono/node-server";
 import { verifiedBeacon } from "../ballot/drand.ts";
 import { tick } from "../ballots/clock.ts";
+import { tickClaims } from "../claims/distribute.ts";
 import { paypalPort } from "../ballots/paypal-port.ts";
 import type { Deps } from "../ballots/service.ts";
 import { openFromEnv } from "../db/db.ts";
 import { PayPalClient } from "../paypal/client.ts";
 import { getUserInfo } from "../paypal/identity.ts";
+import { type PayoutsPort, payoutsPort } from "../claims/payouts-port.ts";
 import { FakePayPal } from "../dev/fake-paypal.ts";
+import { FakePayouts } from "../dev/fake-payouts.ts";
 import { createApp } from "./app.ts";
 
 export type Server = { url: string; deps: Deps; adminToken: string; close: () => Promise<void> };
@@ -22,6 +25,7 @@ export type Runtime = {
   /** The real sandbox client; absent in PAYPAL_MODE=fake. */
   paypal: PayPalClient | undefined;
   fakePayPal: FakePayPal | undefined;
+  payouts: PayoutsPort;
   publicBase: string;
   production: boolean;
   adminToken: string;
@@ -55,11 +59,12 @@ export async function buildRuntime(env: NodeJS.ProcessEnv = process.env): Promis
     now: () => new Date(),
     returnBase: `${publicBase}/paypal`,
   };
-  return { deps, paypal, fakePayPal, publicBase, production, adminToken };
+  const payouts = paypal ? payoutsPort(paypal) : new FakePayouts();
+  return { deps, paypal, fakePayPal, payouts, publicBase, production, adminToken };
 }
 
 export async function startServer(env: NodeJS.ProcessEnv = process.env, options: { clock?: boolean } = {}): Promise<Server> {
-  const { deps, paypal, fakePayPal, publicBase, production, adminToken } = await buildRuntime(env);
+  const { deps, paypal, fakePayPal, payouts, publicBase, production, adminToken } = await buildRuntime(env);
 
   // Log in with PayPal needs a public https return URL registered on the app (localhost is refused).
   const redirectUri = !paypal
@@ -75,6 +80,7 @@ export async function startServer(env: NodeJS.ProcessEnv = process.env, options:
     adminToken,
     webOrigins,
     publicBase,
+    payouts,
     fakePayPal,
     login: redirectUri && paypal
       ? {
@@ -96,6 +102,10 @@ export async function startServer(env: NodeJS.ProcessEnv = process.env, options:
     ? setInterval(() => {
         tick(deps).then(
           (report) => report.errors.forEach((e) => console.error(`clock: ${e.ballot}: ${e.error}`)),
+          (err) => console.error("clock:", err),
+        );
+        tickClaims({ ...deps, payouts }).then(
+          (report) => report.errors.forEach((e) => console.error(`clock: ${e.program}: ${e.error}`)),
           (err) => console.error("clock:", err),
         );
       }, 3000)

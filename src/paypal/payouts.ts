@@ -51,6 +51,8 @@ export function createPayoutBatch(
   });
 }
 
-export function getPayoutBatch(client: PayPalClient, payoutBatchId: string): Promise<PayoutBatch> {
-  return client.request<PayoutBatch>("GET", `/v1/payments/payouts/${encodeURIComponent(payoutBatchId)}`);
+export function getPayoutBatch(client: PayPalClient, payoutBatchId: string, page?: { page: number; pageSize: number }): Promise<PayoutBatch> {
+  return client.request<PayoutBatch>("GET", `/v1/payments/payouts/${encodeURIComponent(payoutBatchId)}`, {
+    ...(page ? { query: { page: String(page.page), page_size: String(page.pageSize) } } : {}),
+  });
 }

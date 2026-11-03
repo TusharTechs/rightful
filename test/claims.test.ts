@@ -14,7 +14,9 @@ import {
   passAfterLogin,
   reviewProgram,
 } from "../src/claims/service.ts";
+import { distributeProgram, syncPayouts, tickClaims } from "../src/claims/distribute.ts";
 import { openPGlite } from "../src/db/db.ts";
+import { FakePayouts } from "../src/dev/fake-payouts.ts";
 import { FakePayPal } from "../src/dev/fake-paypal.ts";
 import type { UserInfo } from "../src/paypal/identity.ts";
 
@@ -201,4 +203,44 @@ test("over HTTP: sign in, file; an agent files, its person signs in and confirms
   nextUser = { verified_account: true };
   const noId = await signIn(`/claim/start?program=${program.id}`);
   assert.equal(noId.page.status, 502, "no payer ID, no claim");
+});
+
+test("approved claims are paid an equal share, by PayPal ID, once, and only after rings are decided", async () => {
+  const { deps: base, clock, program } = await setup();
+  const payouts = new FakePayouts();
+  const deps = { ...base, payouts };
+  for (let i = 0; i < 3; i++) {
+    await fileClaim(deps, program.id, form(), { via: "web", pass: passAfterLogin(deps, program.id, `PAY_${i}`, true), ip: `10.${i}.0.1` });
+  }
+  for (let i = 0; i < 5; i++) {
+    await fileClaim(deps, program.id, form({ device: "farm" }), { via: "web", pass: passAfterLogin(deps, program.id, `RING_${i}`, true), ip: `172.16.${i}.1` });
+  }
+  await fileClaim(deps, program.id, form(), { via: "web", pass: passAfterLogin(deps, program.id, "UNVERIFIED", false), ip: "10.50.0.1" });
+
+  await assert.rejects(distributeProgram(deps, program.id), rejects("wrong_state"), "not before review");
+  clock.now = new Date(T0.getTime() + 3_600_000);
+  const review = await reviewProgram(deps, program.id);
+  await assert.rejects(distributeProgram(deps, program.id), rejects("wrong_state"), "not while a ring waits for a person");
+  await decideClaims(deps, program.id, { ringId: review.rings[0]!.id }, "deny");
+
+  payouts.failing.add("PAY_2");
+  const report = await distributeProgram(deps, program.id);
+  assert.equal(report.claims, 3);
+  assert.equal(report.shareCents, 33_333);
+  assert.equal(report.remainderCents, 1);
+  const [sent] = [...payouts.batches.values()];
+  assert.deepEqual(sent!.request.items.map((i) => i.payerId).sort(), ["PAY_0", "PAY_1", "PAY_2"], "only approved accounts, by their own payer IDs");
+  assert.ok(sent!.request.items.every((i) => i.amountCents === 33_333));
+
+  const again = await distributeProgram(deps, program.id);
+  assert.deepEqual(again.batches, report.batches);
+  assert.equal(payouts.sends, 1, "a second run sends nothing new");
+
+  assert.deepEqual(await syncPayouts(deps, program.id), { paid: 0, failed: 0, pending: 3, done: false });
+  const tick = await tickClaims(deps);
+  assert.deepEqual(tick.synced, [program.id]);
+  assert.deepEqual(await syncPayouts(deps, program.id), { paid: 2, failed: 1, pending: 0, done: true });
+  const statuses = await deps.db.query<{ status: string; n: number }>(`select status, count(*)::int as n from claims group by status order by status`);
+  assert.deepEqual(Object.fromEntries(statuses.map((r) => [r.status, r.n])), { denied: 5, failed: 1, held: 1, paid: 2 });
+  assert.deepEqual((await tickClaims(deps)).synced, [], "done programs are left alone");
 });

@@ -25,6 +25,7 @@ import {
   passAfterLogin,
   reviewProgram,
 } from "../claims/service.ts";
+import { distributeProgram, syncPayouts } from "../claims/distribute.ts";
 import type { LoginIntent } from "./login.ts";
 
 const BIND_COOKIE = "rf_bind";
@@ -59,6 +60,10 @@ export function mountClaims(app: Hono, deps: ClaimsDeps, options: ClaimRoutesOpt
     const report = await reviewProgram(deps, id(c), { early: c.req.query("early") === "1" });
     return c.json(report);
   });
+
+  app.post("/api/programs/:id/distribute", options.admin, async (c) => c.json(await distributeProgram(deps, id(c))));
+
+  app.post("/api/programs/:id/sync", options.admin, async (c) => c.json(await syncPayouts(deps, id(c))));
 
   app.get("/api/programs/:id/claims", options.admin, async (c) => {
     await getProgram(deps.db, id(c));
@@ -180,6 +185,7 @@ async function programView(deps: ClaimsDeps, programId: string) {
     requireVerified: program.require_verified,
     sampleText: program.sample_text,
     closesAt: program.closes_at,
+    shareCents: program.share_cents,
     claims: Object.fromEntries(counts.map((row) => [row.status, row.n])),
   };
 }

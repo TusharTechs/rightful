@@ -113,6 +113,10 @@ create table if not exists claims (
   updated_at        timestamptz not null default now()
 );
 
+-- Distribution: the equal share each approved claim gets, and the Payouts batches that carry it.
+alter table programs add column if not exists share_cents integer;
+alter table programs add column if not exists payout_batches jsonb not null default '[]'::jsonb;
+
 create index if not exists claims_by_program on claims (program_id, status);
 
 -- One PayPal account, one claim per program.
