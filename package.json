@@ -20,7 +20,8 @@
     "dev:web": "vite",
     "build:web": "vite build",
     "preview:web": "vite preview",
-    "dev:api:fake": "PAYPAL_MODE=fake ADMIN_TOKEN=dev-admin-token tsx src/api/main.ts"
+    "dev:api:fake": "PAYPAL_MODE=fake ADMIN_TOKEN=dev-admin-token tsx src/api/main.ts",
+    "eval:rings": "tsx scripts/eval-rings.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.11",

@@ -28,6 +28,8 @@ advance, so anyone can recompute it.
 | `src/ballots/clock.ts` | `tick` (cron job) and `advance` (when a ballot is being watched): seal, draw, settle on time |
 | `src/dev/` | `PAYPAL_MODE=fake` only: the in-memory PayPal and its stand-in approval page. Refused in production |
 | `web/` | Fan app (Vite + React): ballot page, enter with PayPal, live draw, receipts. Imports `src/ballot/*` to verify proofs and the draw in the browser; never import server code into it |
+| `src/rings/` | Claims ring detection: signal normalizers (`signals.ts`), the deterministic detector (`cluster.ts`), a synthetic program with known rings (`synthetic.ts`) and its scorer (`score.ts`) |
+| `scripts/eval-rings.ts` | Offline eval of the detector against a VERIFIED-only baseline (`npm run eval:rings`) |
 | `scripts/probe.ts` | Day-0 sandbox probes (`npm run probe -- all`) |
 | `scripts/demo-ballot.ts` | A real ballot on the sandbox, end to end (`npm run demo:ballot`) |
 | `scripts/clock.ts`, `scripts/migrate.ts` | Render cron job (one tick) and pre-deploy migration |
