@@ -19,7 +19,7 @@ export function typeSafeInvestigator(options: { model?: string } = {}): Investig
     const sdk = new TypeSafeClient();
     const questions = {
       coordinated: noul(
-        "These claims to one settlement program were grouped because they share signals (devices, inboxes, buildings, networks, wording, timing). Each came from a different PayPal account. Were they most likely filed by one person or operation using several accounts, rather than by separate, unrelated people?",
+        "These claims to one settlement program were grouped because they share signals. Each came from a different PayPal account. In the case file, D1, M1, B1, N1 and X1 are stand-in labels for a device, an email inbox, a building, an internet network and a private mail domain: claims with the same label share that thing. Is this group most likely a fraud operation filing through farmed or borrowed accounts? Answer no if it could be real, distinct people each filing their own claim, such as one family at one home sharing a computer and an internet connection, roommates, or people on one campus or office network.",
       ),
       pattern: choice("Which explanation fits what these claims share best?", PATTERNS),
       strength: score("How strong is the evidence that these claims were filed by one operation?", [

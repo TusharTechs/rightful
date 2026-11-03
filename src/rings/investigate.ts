@@ -2,7 +2,7 @@
  * The ring investigator: a second opinion on each suspected ring, for the person who decides.
  *
  * The detector (`cluster.ts`) groups claims; the investigator asks a model three typed questions
- * about each group: were these filed by one operation, which pattern fits, how strong is the
+ * about each group: is it a fraud operation, which pattern fits, how strong is the
  * evidence. It answers with probabilities, not prose, so it cannot invent a fact. Everything the
  * memo states is computed here from the claims, and the recommendation is a fixed rule over the
  * answers. A person still denies or clears the ring; the investigator never does.
@@ -57,7 +57,7 @@ export type CaseFile = {
 };
 
 export type Verdict = {
-  /** Probability these claims were filed by one operation. */
+  /** Probability the group is a fraud operation rather than distinct real people. */
   coordinated: number;
   pattern: Pattern;
   patternConfidence: number;
@@ -145,23 +145,26 @@ export function evidenceOf(file: CaseFile): string[] {
 }
 
 /**
- * The rule from answers to a recommendation. Deny only when the model is confident the group is
- * one operation and names a pattern that is not benign; clear only when it is confident it is not.
+ * The rule from answers to a recommendation. Deny only when the model is confident the group is a
+ * fraud operation and names a pattern that is not benign. Clear only when it names a benign pattern
+ * with confidence and rates fraud unlikely, and never when accounts share an inbox: families do not
+ * route several PayPal accounts to one mailbox. Everything else goes to a person.
  */
-export function recommend(verdict: Verdict): Recommendation {
-  if (verdict.coordinated >= 0.85 && verdict.strength >= 2.5 && !BENIGN.has(verdict.pattern)) return "deny";
-  if (verdict.coordinated <= 0.25 || (BENIGN.has(verdict.pattern) && verdict.patternConfidence >= 0.6 && verdict.coordinated < 0.5)) return "clear";
+export function recommend(verdict: Verdict, file: CaseFile): Recommendation {
+  const benign = BENIGN.has(verdict.pattern);
+  if (verdict.coordinated >= 0.6 && verdict.strength >= 2.5 && !benign) return "deny";
+  if (benign && verdict.patternConfidence >= 0.6 && verdict.coordinated < 0.5 && file.distinct.inboxes === file.claims) return "clear";
   return "review";
 }
 
 export async function investigateRing(investigator: Investigator, ring: Ring, claims: ReadonlyMap<string, ClaimSignals>, sampleText = ""): Promise<Memo> {
   const file = caseFileFor(ring, claims, sampleText);
   const verdict = await investigator.investigate(file);
-  return { ringId: ring.id, claims: ring.claimIds.length, recommendation: recommend(verdict), verdict, evidence: evidenceOf(file) };
+  return { ringId: ring.id, claims: ring.claimIds.length, recommendation: recommend(verdict, file), verdict, evidence: evidenceOf(file) };
 }
 
 /** Bump when the questions change, so recorded answers are not replayed against new questions. */
-export const QUESTIONS_VERSION = "rightful/investigator/v1";
+export const QUESTIONS_VERSION = "rightful/investigator/v2";
 
 /** A stable key for a case file: what replay fixtures are looked up by. */
 export function caseKey(file: CaseFile): string {

@@ -55,14 +55,20 @@ test("the memo's facts come from the claims", () => {
   ]);
 });
 
-test("deny only on a confident, non-benign verdict; clear only on a confident innocent one", () => {
-  assert.equal(recommend(verdict()), "deny");
-  assert.equal(recommend(verdict({ coordinated: 0.8 })), "review");
-  assert.equal(recommend(verdict({ strength: 2 })), "review");
-  assert.equal(recommend(verdict({ pattern: "household" })), "review", "confident it is coordinated, but the pattern is innocent");
-  assert.equal(recommend(verdict({ coordinated: 0.2 })), "clear");
-  assert.equal(recommend(verdict({ coordinated: 0.4, pattern: "household", patternConfidence: 0.7 })), "clear");
-  assert.equal(recommend(verdict({ coordinated: 0.4, pattern: "household", patternConfidence: 0.5 })), "review");
+test("deny only on a confident fraud verdict; clear only a confident benign one with separate inboxes", () => {
+  const { program, byId, rings } = sample();
+  const file = caseFileFor(rings[0]!, byId, program.sampleText);
+  const separate = { ...file, distinct: { ...file.distinct, inboxes: file.claims } };
+  const shared = { ...file, distinct: { ...file.distinct, inboxes: file.claims - 1 } };
+  assert.equal(recommend(verdict(), separate), "deny");
+  assert.equal(recommend(verdict({ coordinated: 0.55 }), separate), "review");
+  assert.equal(recommend(verdict({ strength: 2 }), separate), "review");
+  assert.equal(recommend(verdict({ pattern: "household" }), separate), "review", "a benign pattern is never denied");
+  const family = verdict({ coordinated: 0.3, pattern: "household", patternConfidence: 0.8 });
+  assert.equal(recommend(family, separate), "clear");
+  assert.equal(recommend(family, shared), "review", "accounts sharing an inbox are never cleared");
+  assert.equal(recommend(verdict({ coordinated: 0.2, pattern: "address-mill" }), separate), "review", "low fraud alone does not clear a named ring pattern");
+  assert.equal(recommend({ ...family, patternConfidence: 0.5 }, separate), "review");
 });
 
 test("answers are recorded once and replayed without the live service", async () => {

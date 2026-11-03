@@ -8,6 +8,9 @@
  * gets a case file and the investigator's recommendation (deny, review, clear), scored against the
  * synthetic truth. `replay` (the default) answers from eval/investigator.jsonl and needs no API key;
  * `record` asks TypeSafe for any case not in that file and appends it; `live` asks for every case.
+ *
+ * The questions and the recommendation rule were tuned on seeds 1-5; the default report uses seeds
+ * 101-105, recorded once after tuning. Both sets are in the fixtures, so either replays offline.
  */
 
 import { writeFile } from "node:fs/promises";
