@@ -2,6 +2,8 @@
 
 import type { InclusionProof } from "../../src/ballot/commit.ts";
 import type { PublicProof } from "../../src/ballots/service.ts";
+import type { PayoutLeaf } from "../../src/claims/ledger.ts";
+import type { PublicLedger } from "../../src/claims/distribute.ts";
 
 export const API_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:8787").replace(/\/$/, "");
 
@@ -39,7 +41,21 @@ export type Entry = {
   inclusionProof: InclusionProof | null;
 };
 
-export type { PublicProof };
+export type { PublicLedger, PublicProof };
+
+export type Program = {
+  id: string;
+  title: string;
+  status: "open" | "review" | "distributing" | "done";
+  poolCents: number;
+  currency: string;
+  shareCents: number | null;
+  commitment: string | null;
+  auditRound: number | null;
+  claims: Record<string, number>;
+};
+
+export type PayoutReceipt = { programId: string; root: string; payout: PayoutLeaf; proof: InclusionProof };
 
 export class ApiError extends Error {
   constructor(
@@ -63,6 +79,9 @@ export const api = {
   ballot: (id: string) => call<Ballot>(`/api/ballots/${encodeURIComponent(id)}`),
   proof: (id: string) => call<PublicProof>(`/api/ballots/${encodeURIComponent(id)}/proof`),
   entry: (id: string) => call<Entry>(`/api/entries/${encodeURIComponent(id)}`),
+  program: (id: string) => call<Program>(`/api/programs/${encodeURIComponent(id)}`),
+  ledger: (id: string) => call<PublicLedger>(`/api/programs/${encodeURIComponent(id)}/ledger`),
+  payoutReceipt: (claimId: string) => call<PayoutReceipt>(`/api/claims/${encodeURIComponent(claimId)}/proof`),
   enter: (ballotId: string, quantity: number) =>
     call<{ entryId: string; holdCents: number; approveUrl: string }>(`/api/ballots/${encodeURIComponent(ballotId)}/entries`, {
       method: "POST",

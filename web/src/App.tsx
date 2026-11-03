@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "./components/Link.tsx";
 import { BallotPage } from "./pages/BallotPage.tsx";
 import { HomePage } from "./pages/HomePage.tsx";
+import { LedgerPage } from "./pages/LedgerPage.tsx";
 import { ReceiptPage } from "./pages/ReceiptPage.tsx";
 
 export function App() {
@@ -17,7 +18,16 @@ export function App() {
 
   const ballot = /^\/b\/([\w-]+)\/?$/.exec(path);
   const entry = /^\/e\/([\w-]+)\/?$/.exec(path);
-  const page = ballot ? <BallotPage id={ballot[1]!} /> : entry ? <ReceiptPage id={entry[1]!} /> : <HomePage />;
+  const ledger = /^\/l\/([\w-]+)\/?$/.exec(path);
+  const page = ballot ? (
+    <BallotPage id={ballot[1]!} />
+  ) : entry ? (
+    <ReceiptPage id={entry[1]!} />
+  ) : ledger ? (
+    <LedgerPage id={ledger[1]!} claimId={new URLSearchParams(window.location.search).get("claim")} />
+  ) : (
+    <HomePage />
+  );
 
   return (
     <div className="shell">

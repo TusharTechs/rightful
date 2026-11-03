@@ -27,7 +27,7 @@ advance, so anyone can recompute it.
 | `src/api/` | Hono app (`app.ts`) and server (`main.ts`): REST, PayPal return/cancel, Log in with PayPal (`login.ts`), admin actions |
 | `src/ballots/clock.ts` | `tick` (cron job) and `advance` (when a ballot is being watched): seal, draw, settle on time |
 | `src/dev/` | `PAYPAL_MODE=fake` only: the in-memory PayPal and its stand-in approval page. Refused in production |
-| `web/` | Fan app (Vite + React): ballot page, enter with PayPal, live draw, receipts. Imports `src/ballot/*` to verify proofs and the draw in the browser; never import server code into it |
+| `web/` | Fan app (Vite + React): ballot page, enter with PayPal, live draw, receipts. Imports `src/ballot/*` to verify proofs and the draw in the browser. Claims payout ledger at `/l/:program` (`?claim=` adds the claimant's receipt), verified with `src/claims/ledger.ts`. Never import server code into it (type-only imports are fine) |
 | `src/claims/` | Rightful claims: programs, filing (web with a claim pass, or agent then bind), one claim per PayPal account, review that holds rings and unverified accounts (`service.ts`); the signed pass and sealed payer ID (`pass.ts`) |
 | `src/claims/ledger.ts` | The public payout ledger: Merkle commitment over (claim, human tag, amount) and terms, made before payouts are sent; the drand-picked audit sample; verifiers. Pure, so the web app can bundle it |
 | `src/claims/distribute.ts`, `payouts-port.ts` | Equal-share distribution by Payouts to `PAYPAL_ID` only (after every ring is decided), item sync, cron tick; `src/dev/fake-payouts.ts` stands in for PayPal |
