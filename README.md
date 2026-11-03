@@ -1,63 +1,53 @@
-# Firsthand
+# Rightful
 
-**Agents welcome. Bots aren't.**
+**Agents can file. Only verified humans get paid.**
 
-Fair, bot-proof ballots for anything scarce: concert tickets, limited drops, popular classes.
-Built on PayPal.
+Settlement and refund payouts that claim farms cannot drain. Built on PayPal.
 
-> Status: day 2 of the build. Fans can enter a ballot with PayPal, watch the draw and verify it in
-> their browser; the organizer console and agent gateway are next.
+> Status: in active development for the PayPal hackathon. Claims, payouts, the public ledger, the
+> audit sample and the ring investigator work end to end on the PayPal sandbox; the administrator
+> console and the hosted judge path are next.
 
-## The idea
+## The problem
 
-- **One verified human, one entry.** Fans enter with their PayPal account. Organizers see a per-ballot
-  pseudonym, never the account.
-- **Nobody pays to enter.** An entry is a PayPal authorization hold. Selected fans are captured;
-  everyone else's hold is voided.
-- **A draw nobody can rig.** Entries are sealed under a Merkle root that commits to a future drand
-  round. The order is computed from that round's public randomness, and anyone can recompute it.
-- **Agents welcome, bots aren't.** A fan's AI assistant can enter for them, with a scoped delegation
-  that traces back to one verified human.
+Class-action settlements and mass refunds pay a fixed pool split over valid claims. Bot farms file
+thousands of fake claims with farmed accounts, so every real claimant's share shrinks, and
+administrators either pay the fraud or freeze everyone while they investigate.
 
-## Try what exists today
+## How Rightful works
+
+- **One claim per verified PayPal account.** Claimants sign in with PayPal. The program sees a
+  per-program pseudonym, never the account, and a second claim from the same account is refused.
+- **Agents can file; only people get paid.** An assistant can file a claim over the API. It waits,
+  unbound, until the person it is for signs in with PayPal and confirms it.
+- **Rings are held, not paid.** Claims that share devices, inboxes, buildings, networks or a scripted
+  story are grouped by a deterministic detector. An investigator (TypeSafe Jev, typed answers only)
+  rates each group, the memo's facts are computed in code, and a person decides.
+- **The ledger comes first.** Before any money moves, every payout (claim, pseudonym, amount) is
+  hashed into a Merkle root that also commits to a future drand round. Nobody can add a payout or
+  change one afterwards.
+- **Paid to the account that signed in.** PayPal Payouts sends each share with
+  `recipient_type: PAYPAL_ID` to the payer ID captured at sign-in, and nowhere else.
+- **An audit nobody picks.** Once the committed drand round is out, its randomness picks the claims to
+  audit. Anyone can recompute the ledger and the sample in their browser.
+
+## Try it
 
 ```bash
 npm install
-npm test          # ballot engine, PayPal client, money handling
-npm run probe -- drand
+npm test                    # ledger, claims, payouts, detector, investigator, PayPal client
+npm run eval:rings          # detector vs a VERIFIED-only baseline on synthetic programs (offline)
 ```
 
-The drand probe fetches a live quicknet beacon, verifies its BLS signature against the pinned chain
-key, and runs a 10,000-entry draw over it.
-
-With a PayPal sandbox app set up ([docs/day0-sandbox-setup.md](docs/day0-sandbox-setup.md)):
+With a PayPal sandbox app ([docs/day0-sandbox-setup.md](docs/day0-sandbox-setup.md)) and the API
+deployed or running:
 
 ```bash
-npm run demo:ballot -- 3 2   # 3 fans, 2 seats, on the real sandbox
-npm run dev:api              # the API on http://localhost:8787
+npm run open:program -- --pool 2   # opens a $2 program, files one claim as an agent, prints links
+npm run pay:program -- <programId> # review → ledger → payouts → audit, followed to the end
 ```
 
-The demo prints one PayPal approval link per fan. Approve each as a different sandbox Personal account
-(use "Not you?" on PayPal's page to switch). It then seals the list, waits for the drand round, draws,
-captures the selected holds, voids the rest, reads every hold back from PayPal and re-verifies the draw.
-No database to install: without `DATABASE_URL` it runs Postgres in-process (PGlite).
-
-### Run the fan app locally, no PayPal account needed
-
-```bash
-npm run dev:api:fake   # API with a stand-in PayPal approval page (local only, refused in production)
-npm run dev:web        # fan app on http://localhost:5173
-```
-
-Create a ballot (`ADMIN_TOKEN` is `dev-admin-token` in this mode), open it in the fan app, enter, and
-approve on the stand-in page. Two minutes later the clock seals, draws and settles it, and
-**Verify in my browser** re-checks the draw against drand itself.
-
-```bash
-curl -X POST localhost:8787/api/ballots -H "authorization: Bearer dev-admin-token" \
-  -H "content-type: application/json" \
-  -d '{"title":"Night one","priceCents":4500,"inventory":2,"perHumanLimit":2,"closesInSeconds":120}'
-```
+No database to install: without `DATABASE_URL` the API runs Postgres in-process (PGlite).
 
 ## License
 

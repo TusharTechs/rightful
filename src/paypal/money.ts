@@ -1,5 +1,5 @@
 /**
- * Amounts are integer minor units (cents) everywhere in Firsthand. Code converts them to PayPal's
+ * Amounts are integer minor units (cents) everywhere in Rightful. Code converts them to PayPal's
  * decimal strings at the edge; no model ever computes or formats a price.
  */
 

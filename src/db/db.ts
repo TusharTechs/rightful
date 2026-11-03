@@ -127,3 +127,8 @@ export async function waitForPostgres(
     }
   }
 }
+
+/** True for Postgres's unique_violation, from either engine. */
+export function isUniqueViolation(err: unknown): boolean {
+  return typeof err === "object" && err !== null && "code" in err && (err as { code?: string }).code === "23505";
+}

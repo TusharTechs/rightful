@@ -5,17 +5,17 @@
  *
  * Closes the program early if it is still open. Suspected rings must be decided before anything is
  * paid: pass --deny or --approve with their IDs, or the script lists them and stops. Reads
- * FIRSTHAND_API and FIRSTHAND_ADMIN_TOKEN like `open:program`.
+ * RIGHTFUL_API and RIGHTFUL_ADMIN_TOKEN like `open:program`.
  */
 
 import { parseArgs } from "node:util";
 
-const api = (process.env.FIRSTHAND_API ?? "https://firsthand-api.onrender.com").replace(/\/$/, "");
-const token = process.env.FIRSTHAND_ADMIN_TOKEN;
+const api = (process.env.RIGHTFUL_API ?? "https://rightful-api.onrender.com").replace(/\/$/, "");
+const token = process.env.RIGHTFUL_ADMIN_TOKEN;
 const { values, positionals } = parseArgs({ allowPositionals: true, options: { deny: { type: "string" }, approve: { type: "string" } } });
 const programId = positionals[0];
 if (!token || !programId) {
-  console.error("Usage: npm run pay:program -- <programId>   (needs FIRSTHAND_ADMIN_TOKEN in .env)");
+  console.error("Usage: npm run pay:program -- <programId>   (needs RIGHTFUL_ADMIN_TOKEN in .env)");
   process.exit(1);
 }
 

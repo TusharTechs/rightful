@@ -12,8 +12,8 @@
  * The leftover cents from rounding down stay in the pool; nobody gets a larger share.
  */
 
-import { type InclusionProof } from "../ballot/commit.ts";
-import { QUICKNET, roundAtOrAfter, timeOfRound } from "../ballot/drand.ts";
+import { type InclusionProof } from "../engine/merkle.ts";
+import { QUICKNET, roundAtOrAfter, timeOfRound } from "../engine/drand.ts";
 import { type DistributionTerms, type LedgerCommitment, type PayoutLeaf, auditSample, auditSizeFor, commitDistribution, provePayout } from "./ledger.ts";
 import { openPayee, claimKeys } from "./pass.ts";
 import { NOT_PAID, PAID, type PayoutsPort } from "./payouts-port.ts";

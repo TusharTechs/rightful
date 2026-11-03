@@ -79,7 +79,7 @@ export class PayPalClient {
   /** Builds a client from `PAYPAL_*` variables. Refuses anything but the sandbox. */
   static fromEnv(env: NodeJS.ProcessEnv = process.env): PayPalClient {
     if ((env.PAYPAL_ENV ?? "sandbox") !== "sandbox") {
-      throw new Error("Firsthand only talks to the PayPal sandbox. Set PAYPAL_ENV=sandbox.");
+      throw new Error("Rightful only talks to the PayPal sandbox. Set PAYPAL_ENV=sandbox.");
     }
     const clientId = env.PAYPAL_CLIENT_ID;
     const clientSecret = env.PAYPAL_CLIENT_SECRET;

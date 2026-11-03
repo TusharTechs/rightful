@@ -1,12 +1,12 @@
-# Firsthand on Render. One Blueprint provisions everything. Services are added here as they are
+# Rightful on Render. One Blueprint provisions everything. Services are added here as they are
 # built; docs/architecture.md shows the target layout and why each piece is separate.
 projects:
-  - name: firsthand
+  - name: rightful
     environments:
       - name: production
         envVarGroups:
           # Generated once on first deploy and shared by every service that needs them.
-          - name: firsthand-secrets
+          - name: rightful-secrets
             envVars:
               - key: HUMAN_TAG_SECRET
                 generateValue: true
@@ -16,9 +16,9 @@ projects:
         databases:
           # The ledger. A paid plan, because free databases are deleted after 30 days and judging
           # runs into mid-December.
-          - name: firsthand-db
-            databaseName: firsthand
-            user: firsthand
+          - name: rightful-db
+            databaseName: rightful
+            user: rightful
             plan: 0.1c-256mb
             region: oregon
             postgresMajorVersion: "18"
@@ -26,11 +26,11 @@ projects:
             ipAllowList: []
 
         services:
-          # Public API: REST, PayPal return and Log in with PayPal callbacks. Always on, so judges
+          # Public API: claims, agents, ledgers, and the Log in with PayPal callback. Always on, so judges
           # never hit a cold start. Builds run the type checker and the test suite; a failing build
           # never deploys, and the pre-deploy migration runs before any new instance takes traffic.
           - type: web
-            name: firsthand-api
+            name: rightful-api
             runtime: node
             plan: 0.5c-512mb
             region: oregon
@@ -52,20 +52,19 @@ projects:
                 sync: false
               - key: PAYPAL_CLIENT_SECRET
                 sync: false
-              - fromGroup: firsthand-secrets
+              - fromGroup: rightful-secrets
               - key: DATABASE_URL
                 fromDatabase:
-                  name: firsthand-db
+                  name: rightful-db
                   property: connectionString
-              # The fan app's exact address: the only place PayPal returns fans to (comma-separated).
-              - key: WEB_ORIGINS
-                value: https://firsthand-web-zzfq.onrender.com
+              # Optional: the ring investigator (TypeSafe Jev). Without a key, rings carry evidence only.
+              - key: TYPESAFE_API_KEY
+                sync: false
 
-          # Fan app: static files only, so it needs no server. The API URL is baked in at build
-          # time. The API trusts this site's exact address through WEB_ORIGINS (set on the API),
-          # never a name pattern, and never references this service, so there is no dependency cycle.
+          # Web app: programs, payout ledgers and the in-browser verifier. Static files only, so it
+          # needs no server; the API URL is baked in at build time.
           - type: web
-            name: firsthand-web
+            name: rightful-web
             runtime: static
             buildCommand: npm ci --include=dev && npm run build:web
             staticPublishPath: web/dist
@@ -86,16 +85,15 @@ projects:
                 value: "22"
               - key: VITE_API_URL
                 fromService:
-                  name: firsthand-api
+                  name: rightful-api
                   type: web
                   envVarKey: RENDER_EXTERNAL_URL
 
-          # The clock: every minute, seal ballots whose entries closed, draw ballots whose drand
-          # round is out, and settle drawn ballots. The API also advances a ballot the moment someone
-          # is watching it; this job is the backstop, so nothing waits on a visitor. Every step is
-          # idempotent, so the two overlapping is safe.
+          # The clock: every minute, read back payouts that are still moving and draw audit samples
+          # whose drand round is out. Sandbox webhooks can lag by hours, so polling is the source of
+          # truth. Every step is idempotent, so a slow tick overlapping the next is safe.
           - type: cron
-            name: firsthand-clock
+            name: rightful-clock
             runtime: node
             region: oregon
             schedule: "* * * * *"
@@ -111,16 +109,16 @@ projects:
               # Same PayPal app as the API, read from it so the secret is entered only once.
               - key: PAYPAL_CLIENT_ID
                 fromService:
-                  name: firsthand-api
+                  name: rightful-api
                   type: web
                   envVarKey: PAYPAL_CLIENT_ID
               - key: PAYPAL_CLIENT_SECRET
                 fromService:
-                  name: firsthand-api
+                  name: rightful-api
                   type: web
                   envVarKey: PAYPAL_CLIENT_SECRET
-              - fromGroup: firsthand-secrets
+              - fromGroup: rightful-secrets
               - key: DATABASE_URL
                 fromDatabase:
-                  name: firsthand-db
+                  name: rightful-db
                   property: connectionString

@@ -1,9 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "./components/Link.tsx";
-import { BallotPage } from "./pages/BallotPage.tsx";
 import { HomePage } from "./pages/HomePage.tsx";
 import { LedgerPage } from "./pages/LedgerPage.tsx";
-import { ReceiptPage } from "./pages/ReceiptPage.tsx";
 
 export function App() {
   const [path, setPath] = useState(() => window.location.pathname);
@@ -16,27 +14,17 @@ export function App() {
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
-  const ballot = /^\/b\/([\w-]+)\/?$/.exec(path);
-  const entry = /^\/e\/([\w-]+)\/?$/.exec(path);
   const ledger = /^\/l\/([\w-]+)\/?$/.exec(path);
-  const page = ballot ? (
-    <BallotPage id={ballot[1]!} />
-  ) : entry ? (
-    <ReceiptPage id={entry[1]!} />
-  ) : ledger ? (
-    <LedgerPage id={ledger[1]!} claimId={new URLSearchParams(window.location.search).get("claim")} />
-  ) : (
-    <HomePage />
-  );
+  const page = ledger ? <LedgerPage id={ledger[1]!} claimId={new URLSearchParams(window.location.search).get("claim")} /> : <HomePage />;
 
   return (
     <div className="shell">
       <header className="topbar">
         <Link to="/" className="wordmark">
-          <span className="mark" aria-hidden="true">F</span>
-          Firsthand
+          <span className="mark" aria-hidden="true">R</span>
+          Rightful
         </Link>
-        <span className="tagline">Agents welcome. Bots aren't.</span>
+        <span className="tagline">Agents can file. Only verified humans get paid.</span>
       </header>
       <main>{page}</main>
       <footer className="footer">

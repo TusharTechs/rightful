@@ -45,7 +45,7 @@ export function usePoll<T>(load: () => Promise<T>, ms: number, stop: (value: T) 
   return { value, error };
 }
 
-/** A clock that ticks every second, corrected by the server's clock so countdowns agree with it. */
+/** A clock that ticks every second, corrected by the server's clock when one is given. */
 export function useNow(serverTime?: string): number {
   const [now, setNow] = useState(() => Date.now());
   const skew = useRef(0);
@@ -67,29 +67,6 @@ export function countdown(ms: number): string {
   const sec = s % 60;
   return h > 0 ? `${h}h ${String(m).padStart(2, "0")}m` : m > 0 ? `${m}:${String(sec).padStart(2, "0")}` : `${sec}s`;
 }
-
-/** Entries this browser started, so the draw can say "you". Stored locally only. */
-export const myEntries = {
-  all(): Record<string, string> {
-    try {
-      return JSON.parse(localStorage.getItem("firsthand.entries") ?? "{}") as Record<string, string>;
-    } catch {
-      return {};
-    }
-  },
-  add(entryId: string, ballotId: string) {
-    try {
-      localStorage.setItem("firsthand.entries", JSON.stringify({ ...this.all(), [entryId]: ballotId }));
-    } catch {
-      // Private mode: the app still works, it just can't highlight your entry.
-    }
-  },
-  forBallot(ballotId: string): string[] {
-    return Object.entries(this.all())
-      .filter(([, b]) => b === ballotId)
-      .map(([e]) => e);
-  },
-};
 
 export function navigate(path: string) {
   window.history.pushState({}, "", path);

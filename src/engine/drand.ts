@@ -1,9 +1,9 @@
 /**
- * Public randomness for the draw, from drand quicknet (League of Entropy).
+ * Public randomness for the audit sample, from drand quicknet (League of Entropy).
  *
- * The ballot commits to a future round before entries close. Nobody, including the organizer, can
- * know that round's randomness in advance, and anyone can check the beacon against the chain's
- * public key afterwards. Chain info is pinned here so a relay cannot swap in a different network.
+ * A program's payout ledger commits to a future round before any payout is sent. Nobody, including
+ * the organizer, can know that round's randomness in advance, and anyone can check the beacon
+ * against the chain's public key afterwards. Chain info is pinned here so a relay cannot swap in a different network.
  */
 
 import {
@@ -58,7 +58,7 @@ export async function verifiedBeacon(round: number, clients: ChainClient[] = REL
   throw lastError;
 }
 
-/** The first round published at or after `date`: a draw scheduled for `date` uses this round. */
+/** The first round published at or after `date`: an audit scheduled for `date` uses this round. */
 export function roundAtOrAfter(date: Date): number {
   const round = roundAt(date.getTime(), QUICKNET);
   return roundTime(QUICKNET, round) < date.getTime() ? round + 1 : round;

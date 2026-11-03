@@ -91,6 +91,11 @@ export function mountClaims(app: Hono, deps: ClaimsDeps, options: ClaimRoutesOpt
 
   // --- public and agents -----------------------------------------------------------------------
 
+  app.get("/api/programs", async (c) => {
+    const rows = await deps.db.query<{ id: string }>(`select id from programs order by created_at desc limit 20`);
+    return c.json(await Promise.all(rows.map((row) => programView(deps, row.id))));
+  });
+
   app.get("/api/programs/:id", async (c) => c.json(await programView(deps, id(c))));
 
   app.post("/api/programs/:id/claims", async (c) => {

@@ -1,7 +1,7 @@
 {
-  "name": "firsthand",
+  "name": "rightful",
   "version": "0.1.0",
-  "description": "Fair, bot-proof ballots for scarce things. One verified PayPal human, one entry; only winners are charged.",
+  "description": "Settlement and refund payouts that claim farms cannot drain: one claim per verified PayPal account, a public ledger before any money moves, payment only to the account that signed in.",
   "license": "MIT",
   "private": true,
   "type": "module",
@@ -15,7 +15,6 @@
     "test": "tsx --test \"test/**/*.test.ts\"",
     "probe": "tsx --env-file-if-exists=.env scripts/probe.ts",
     "dev:api": "tsx --env-file-if-exists=.env src/api/main.ts",
-    "demo:ballot": "tsx --env-file-if-exists=.env scripts/demo-ballot.ts",
     "clock": "tsx scripts/clock.ts",
     "dev:web": "vite",
     "build:web": "vite build",

@@ -1,71 +1,33 @@
 /**
- * The public HTTP API (the `firsthand-api` web service).
+ * The public HTTP API (the `rightful-api` web service).
  *
- * Fans create an entry, approve the hold on PayPal, and come back through `/paypal/return`.
- * Organizer actions (create, seal, draw, settle) need the admin token for now; on Render the
- * cron job and workflows call the same service functions directly.
+ * Claimants sign in with PayPal and file, or confirm a claim an agent filed for them; agents file
+ * over JSON; anyone can read a program and its payout ledger. Organizer actions (create, review,
+ * decide, distribute) need the admin token; on Render the cron job calls the same functions.
  */
 
 import { timingSafeEqual } from "node:crypto";
 import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
-import { timeOfRound } from "../ballot/drand.ts";
+import { type ClaimsDeps, ClaimError } from "../claims/service.ts";
 import { PayPalError } from "../paypal/client.ts";
-import type { PayoutsPort } from "../claims/payouts-port.ts";
-import type { Investigator } from "../rings/investigate.ts";
-import { ClaimError } from "../claims/service.ts";
 import { claimantAfterLogin, mountClaims } from "./claims.ts";
 import { type LoginConfig, mountLogin } from "./login.ts";
-import { advance } from "../ballots/clock.ts";
-import type { FakePayPal } from "../dev/fake-paypal.ts";
-import { mountFakePayPal } from "../dev/fake-paypal-routes.ts";
-import {
-  type Deps,
-  type EntryRow,
-  BallotError,
-  cancelEntry,
-  completeEntry,
-  createBallot,
-  entryReceipt,
-  getBallot,
-  publicProof,
-  runDraw,
-  sealBallot,
-  settleBallot,
-  startEntry,
-} from "../ballots/service.ts";
 
 export type AppOptions = {
   adminToken: string;
   login?: LoginConfig;
-  /** Origins the web app may ask PayPal to send fans back to. Anything else falls back to API pages. */
-  webOrigins?: (string | RegExp)[];
-  /** Payouts for claims distribution. */
-  payouts?: PayoutsPort;
-  /** Writes memos on suspected rings. */
-  investigator?: Investigator;
   /** The API's public origin, for links handed to agents. */
   publicBase?: string;
-  /** Local development only: serve a stand-in PayPal approval page. */
-  fakePayPal?: FakePayPal;
 };
 
-export function createApp(deps: Deps, options: AppOptions) {
+export function createApp(deps: ClaimsDeps, options: AppOptions) {
   const app = new Hono();
   if (options.login) mountLogin(app, { claimant: claimantAfterLogin(deps), ...options.login }, () => deps.now().getTime());
-  if (options.fakePayPal) mountFakePayPal(app, options.fakePayPal);
-  // The API uses no cookies outside /auth, so any origin may read public data and create entries.
+  // The API uses no cookies outside /auth and /claim, so any origin may read public data and file.
   app.use("/api/*", cors({ origin: "*", allowHeaders: ["content-type", "authorization"], allowMethods: ["GET", "POST"] }));
-  const allowedReturn = (origin: unknown): string | undefined =>
-    typeof origin === "string" && (options.webOrigins ?? []).some((rule) => (typeof rule === "string" ? rule === origin : rule.test(origin)))
-      ? origin
-      : undefined;
 
   app.onError((err, c) => {
-    if (err instanceof BallotError) {
-      const status = { not_found: 404, closed: 409, wrong_state: 409, invalid: 400, too_early: 425 }[err.code];
-      return c.json({ error: err.code, message: err.message }, status as 400);
-    }
     if (err instanceof ClaimError) {
       const status = { not_found: 404, closed: 409, wrong_state: 409, duplicate: 409, invalid: 400, unauthorized: 401 }[err.code];
       return c.json({ error: err.code, message: err.message }, status as 400);
@@ -86,157 +48,7 @@ export function createApp(deps: Deps, options: AppOptions) {
 
   app.get("/health", (c) => c.json({ ok: true }));
 
-  mountClaims(app, { ...deps, payouts: options.payouts, investigator: options.investigator }, { admin, publicBase: options.publicBase });
-
-  app.post("/api/ballots", admin, async (c) => {
-    const body = await c.req.json<Record<string, unknown>>();
-    const closesAt =
-      typeof body.closesAt === "string"
-        ? new Date(body.closesAt)
-        : new Date(deps.now().getTime() + Number(body.closesInSeconds ?? 600) * 1000);
-    const ballot = await createBallot(deps, {
-      title: String(body.title ?? ""),
-      priceCents: Number(body.priceCents),
-      currency: typeof body.currency === "string" ? body.currency : undefined,
-      inventory: Number(body.inventory),
-      perHumanLimit: body.perHumanLimit === undefined ? undefined : Number(body.perHumanLimit),
-      maxQuantity: body.maxQuantity === undefined ? undefined : Number(body.maxQuantity),
-      allowPartial: Boolean(body.allowPartial),
-      requireVerified: body.requireVerified === undefined ? undefined : Boolean(body.requireVerified),
-      closesAt,
-    });
-    return c.json(await ballotView(deps, ballot.id), 201);
-  });
-
-  app.get("/api/ballots", async (c) => {
-    const rows = await deps.db.query<{ id: string }>(
-      `select id from ballots where status <> 'cancelled' order by created_at desc limit 20`,
-    );
-    return c.json(await Promise.all(rows.map((row) => ballotView(deps, row.id))));
-  });
-
-  // Someone is watching this ballot: run any step that is due now rather than waiting for the cron
-  // tick. Sealing and drawing are quick and awaited; settling calls PayPal, so it runs behind.
-  const settling = new Set<string>();
-  const advanceWhileWatching = async (id: string) => {
-    try {
-      await advance(deps, id, { settle: false });
-      const ballot = await getBallot(deps.db, id);
-      if (ballot.status === "drawn" && !settling.has(id)) {
-        settling.add(id);
-        settleBallot(deps, id)
-          .catch((err) => console.error(`settle ${id}:`, err))
-          .finally(() => settling.delete(id));
-      }
-    } catch (err) {
-      if (!(err instanceof BallotError && err.code === "not_found")) console.error(`advance ${id}:`, err);
-    }
-  };
-
-  app.get("/api/ballots/:id", async (c) => {
-    await advanceWhileWatching(param(c));
-    return c.json(await ballotView(deps, param(c)));
-  });
-
-  app.post("/api/ballots/:id/entries", async (c) => {
-    const body = await c.req.json<{ quantity?: number; returnTo?: string }>().catch(() => ({}) as { quantity?: number; returnTo?: string });
-    const { entry, approveUrl } = await startEntry(deps, param(c), Number(body.quantity ?? 1), allowedReturn(body.returnTo));
-    return c.json({ entryId: entry.id, holdCents: entry.hold_cents, approveUrl }, 201);
-  });
-
-  app.get("/api/entries/:id", async (c) => {
-    const { entry, proof } = await entryReceipt(deps, param(c));
-    return c.json({ ...entryView(entry), inclusionProof: proof });
-  });
-
-  app.get("/api/ballots/:id/proof", async (c) => c.json(await publicProof(deps, param(c))));
-
-  app.post("/api/ballots/:id/seal", admin, async (c) => {
-    await sealBallot(deps, param(c), { early: c.req.query("early") === "1" });
-    return c.json(await ballotView(deps, param(c)));
-  });
-  app.post("/api/ballots/:id/draw", admin, async (c) => {
-    await runDraw(deps, param(c));
-    return c.json(await ballotView(deps, param(c)));
-  });
-  app.post("/api/ballots/:id/settle", admin, async (c) => c.json(await settleBallot(deps, param(c))));
-
-  // PayPal sends the fan back here after they approve (or cancel) the hold.
-  app.get("/paypal/return", async (c) => {
-    const entry = await completeEntry(deps, c.req.query("entry") ?? "");
-    if (entry.return_to && allowedReturn(entry.return_to)) return c.redirect(`${entry.return_to}/e/${entry.id}`, 303);
-    const message =
-      entry.status === "held"
-        ? "You're in. Your hold is placed; you are charged only if you are selected."
-        : entry.rejection === "duplicate"
-          ? "You already have an entry in this ballot. This one was released and you were not charged."
-          : entry.rejection === "unverified"
-            ? "This ballot needs a verified PayPal account. The hold was released and you were not charged."
-            : entry.rejection === "closed"
-              ? "Entries closed before your approval arrived. Nothing was held."
-              : `Entry status: ${entry.status}`;
-    return c.html(page("Firsthand", message, entry.id));
-  });
-
-  app.get("/paypal/cancel", async (c) => {
-    const entry = await cancelEntry(deps, c.req.query("entry") ?? "");
-    if (entry.return_to && allowedReturn(entry.return_to)) return c.redirect(`${entry.return_to}/b/${entry.ballot_id}?cancelled=1`, 303);
-    return c.html(page("Firsthand", "You cancelled. Nothing was held.", entry.id));
-  });
+  mountClaims(app, deps, { admin, publicBase: options.publicBase });
 
   return app;
-}
-
-async function ballotView(deps: Deps, id: string) {
-  const ballot = await getBallot(deps.db, id);
-  const counts = await deps.db.query<{ status: string; n: number }>(
-    `select status, count(*)::int as n from entries where ballot_id = $1 group by status`,
-    [id],
-  );
-  const round = ballot.draw_round ?? ballot.planned_round;
-  return {
-    id: ballot.id,
-    title: ballot.title,
-    status: ballot.status,
-    priceCents: ballot.price_cents,
-    currency: ballot.currency,
-    inventory: ballot.inventory,
-    perHumanLimit: ballot.per_human_limit,
-    maxQuantity: ballot.max_quantity,
-    closesAt: ballot.closes_at,
-    drawRound: round,
-    drawRoundFixed: ballot.draw_round !== null,
-    drawAt: timeOfRound(round),
-    serverTime: deps.now(),
-    commitment: ballot.commitment_digest,
-    entries: Object.fromEntries(counts.map((row) => [row.status, row.n])),
-  };
-}
-
-function param(c: Context): string {
-  return c.req.param("id") ?? "";
-}
-
-function entryView(entry: EntryRow) {
-  return {
-    id: entry.id,
-    ballotId: entry.ballot_id,
-    quantity: entry.quantity,
-    holdCents: entry.hold_cents,
-    status: entry.status,
-    rejection: entry.rejection,
-    outcome: entry.outcome,
-    selectedUnits: entry.selected_units,
-    position: entry.position,
-    humanTag: entry.human_tag,
-  };
-}
-
-function page(title: string, message: string, entryId: string) {
-  const escape = (s: string) => s.replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escape(title)}</title></head>
-<body style="font:16px/1.5 system-ui,sans-serif;max-width:32rem;margin:4rem auto;padding:0 1rem">
-<h1 style="font-size:1.4rem">${escape(title)}</h1><p>${escape(message)}</p>
-<p style="color:#555;font-size:.9rem">Entry <code>${escape(entryId)}</code></p></body></html>`;
 }

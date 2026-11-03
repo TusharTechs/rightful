@@ -1,13 +1,12 @@
-import type { BallotStatus } from "../api.ts";
+import type { ProgramStatus } from "../api.ts";
 
-const LABELS: Record<BallotStatus, string> = {
-  open: "Entries open",
-  sealed: "Sealed",
-  drawn: "Drawn",
-  settled: "Settled",
-  cancelled: "Cancelled",
+const LABELS: Record<ProgramStatus, string> = {
+  open: "Claims open",
+  review: "In review",
+  distributing: "Paying out",
+  done: "Paid",
 };
 
-export function StatusPill({ status }: { status: BallotStatus }) {
+export function StatusPill({ status }: { status: ProgramStatus }) {
   return <span className={`pill pill-${status}`}>{LABELS[status]}</span>;
 }

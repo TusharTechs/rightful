@@ -9,7 +9,7 @@
 
 export interface ClaimSignals {
   id: string;
-  /** Per-program pseudonym of the PayPal account that signed in (see `src/ballot/human.ts`). */
+  /** Per-program pseudonym of the PayPal account that signed in (see `src/engine/human.ts`). */
   humanTag: string;
   verified: boolean;
   email: string;

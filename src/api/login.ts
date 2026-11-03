@@ -1,5 +1,5 @@
 /**
- * Log in with PayPal for fans: proves "a verified PayPal human is here" before they enter.
+ * Log in with PayPal for claimants: proves "a verified PayPal account is here" before they file.
  *
  * CSRF protection is the usual OAuth double-submit: a random nonce goes into an HttpOnly cookie
  * and, HMAC-signed with a timestamp, into `state`. The callback accepts only a fresh, correctly
@@ -28,7 +28,7 @@ export type LoginConfig = {
 
 export type LoginIntent = { program: string; claim?: string };
 
-const COOKIE = "fh_login";
+const COOKIE = "rf_login";
 const STATE_TTL_MS = 10 * 60_000;
 
 export function signState(key: Uint8Array, nonce: string, issuedAt: number, intent?: LoginIntent): string {
@@ -79,19 +79,19 @@ export function mountLogin(app: Hono, config: LoginConfig, now: () => number = D
     const info = await config.exchange(code);
     if (state.intent && config.claimant) return config.claimant(c, state.intent, info);
     return isVerified(info)
-      ? c.html(loginPage("Verified human ✓", "PayPal confirms this is a verified account. You can enter ballots."))
-      : c.html(loginPage("Not verified", "PayPal says this account is not verified yet, so it cannot enter ballots that require one."));
+      ? c.html(loginPage("Verified human ✓", "PayPal confirms this is a verified account."))
+      : c.html(loginPage("Not verified", "PayPal says this account is not verified yet."));
   });
 }
 
 function mac(key: Uint8Array, nonce: string, issuedAt: number, carried: string): string {
-  return bytesToHex(hmac(sha256, key, utf8ToBytes(`firsthand/login-state/v2\n${nonce}\n${issuedAt}\n${carried}`)));
+  return bytesToHex(hmac(sha256, key, utf8ToBytes(`rightful/login-state/v1\n${nonce}\n${issuedAt}\n${carried}`)));
 }
 
 function loginPage(title: string, message: string) {
   const escape = (s: string) => s.replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Firsthand</title></head>
+<title>Rightful</title></head>
 <body style="font:16px/1.5 system-ui,sans-serif;max-width:32rem;margin:4rem auto;padding:0 1rem">
 <h1 style="font-size:1.4rem">${escape(title)}</h1><p>${escape(message)}</p></body></html>`;
 }

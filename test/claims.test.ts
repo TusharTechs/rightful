@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createApp } from "../src/api/app.ts";
-import type { Deps } from "../src/ballots/service.ts";
 import { claimKeys, issuePass, openPayee, readPass, sealPayee } from "../src/claims/pass.ts";
 import {
   type ClaimsDeps,
@@ -19,10 +18,9 @@ import {
 import type { Investigator } from "../src/rings/investigate.ts";
 import { distributeProgram, payoutProof, publicLedger, syncPayouts, tickClaims } from "../src/claims/distribute.ts";
 import { payoutIsInLedger, verifyLedger } from "../src/claims/ledger.ts";
-import { timeOfRound } from "../src/ballot/drand.ts";
+import { timeOfRound } from "../src/engine/drand.ts";
 import { openPGlite } from "../src/db/db.ts";
 import { FakePayouts } from "../src/dev/fake-payouts.ts";
-import { FakePayPal } from "../src/dev/fake-paypal.ts";
 import type { UserInfo } from "../src/paypal/identity.ts";
 
 const SECRET = new Uint8Array(32).fill(9);
@@ -131,14 +129,7 @@ test("review holds rings and unverified claims for a person, and approves the re
 
 test("over HTTP: sign in, file; an agent files, its person signs in and confirms", async () => {
   const clock = { now: T0 };
-  const deps: Deps = {
-    db: await openPGlite(),
-    paypal: new FakePayPal(),
-    humanSecret: SECRET,
-    beacon: async (round) => ({ round, randomness: "0".repeat(64), signature: "sig" }),
-    now: () => clock.now,
-    returnBase: "http://localhost:8787/paypal",
-  };
+  const deps: ClaimsDeps = { db: await openPGlite(), humanSecret: SECRET, now: () => clock.now };
   let nextUser: UserInfo = { payer_id: "PAYER_WEB", verified_account: "true" };
   const app = createApp(deps, {
     adminToken: "t",

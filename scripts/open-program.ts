@@ -5,16 +5,16 @@
  *
  * Use a small pool (say --pool 2) to pay for real in the sandbox: its balance cannot cover $2M.
  *
- * Reads FIRSTHAND_API (default: the hosted API) and FIRSTHAND_ADMIN_TOKEN from the environment or
+ * Reads RIGHTFUL_API (default: the hosted API) and RIGHTFUL_ADMIN_TOKEN from the environment or
  * .env. Also files one claim the way an agent would, and prints the link its person would get.
  */
 
 import { parseArgs } from "node:util";
 
-const api = (process.env.FIRSTHAND_API ?? "https://firsthand-api.onrender.com").replace(/\/$/, "");
-const token = process.env.FIRSTHAND_ADMIN_TOKEN;
+const api = (process.env.RIGHTFUL_API ?? "https://rightful-api.onrender.com").replace(/\/$/, "");
+const token = process.env.RIGHTFUL_ADMIN_TOKEN;
 if (!token) {
-  console.error("Set FIRSTHAND_ADMIN_TOKEN (Render: firsthand-secrets → ADMIN_TOKEN) in .env first.");
+  console.error("Set RIGHTFUL_ADMIN_TOKEN (Render: rightful-secrets → ADMIN_TOKEN) in .env first.");
   process.exit(1);
 }
 const { values } = parseArgs({
@@ -64,4 +64,4 @@ Confirm the claim an agent filed (use a different sandbox account, in a private 
   ${agent.bindUrl}
 
 Admin view:
-  curl -H "authorization: Bearer $FIRSTHAND_ADMIN_TOKEN" ${api}/api/programs/${program.id}/claims`);
+  curl -H "authorization: Bearer $RIGHTFUL_ADMIN_TOKEN" ${api}/api/programs/${program.id}/claims`);

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { QUICKNET } from "../src/ballot/drand.ts";
-import { humanTag } from "../src/ballot/human.ts";
+import { QUICKNET } from "../src/engine/drand.ts";
+import { humanTag } from "../src/engine/human.ts";
 import { type DistributionTerms, type PayoutLeaf, auditSample, auditSizeFor, commitDistribution, payoutIsInLedger, provePayout, verifyLedger } from "../src/claims/ledger.ts";
 
 const SECRET = new Uint8Array(32).fill(2);

@@ -7,10 +7,11 @@
  * The same ledger code the server ran (src/claims/ledger.ts), bundled into the page.
  */
 
-import { QUICKNET, timeOfRound, verifiedBeacon } from "../../src/ballot/drand.ts";
+import { QUICKNET, timeOfRound, verifiedBeacon } from "../../src/engine/drand.ts";
 import { verifyLedger } from "../../src/claims/ledger.ts";
 import type { PublicLedger } from "./api.ts";
-import type { CheckStep } from "./verify.ts";
+
+export type CheckStep = { label: string; ok: boolean; detail: string };
 
 export async function verifyPublishedLedger(ledger: PublicLedger, onStep: (step: CheckStep) => void): Promise<boolean> {
   const committed = verifyLedger(ledger.terms, ledger.payouts, { commitment: ledger.commitment });

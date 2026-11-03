@@ -14,9 +14,8 @@
  */
 
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
-import type { Db } from "../db/db.ts";
-import { humanTag } from "../ballot/human.ts";
-import { isUniqueViolation } from "../ballots/service.ts";
+import { type Db, isUniqueViolation } from "../db/db.ts";
+import { humanTag } from "../engine/human.ts";
 import { findRings, type Ring } from "../rings/cluster.ts";
 import { type Investigator, type Memo, investigateRing } from "../rings/investigate.ts";
 import type { ClaimSignals } from "../rings/signals.ts";

@@ -1,5 +1,5 @@
 import { type ReactNode, useState } from "react";
-import type { CheckStep } from "../verify.ts";
+import type { CheckStep } from "../verify-ledger.ts";
 
 /** "Don't trust us, check": runs a list of checks in this browser and shows each result. */
 export function ChecksPanel(props: {

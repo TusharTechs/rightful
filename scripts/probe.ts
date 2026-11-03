@@ -2,10 +2,10 @@
  * Day-0 sandbox probes: find out what this PayPal sandbox app can actually do before any feature
  * depends on it.
  *
- *   npm run probe -- <name...>     names: token drand reporting webhooks payouts hold vault login jev
+ *   npm run probe -- <name...>     names: token drand reporting webhooks payouts payout-id login jev
  *   npm run probe -- all
  *
- * Probes that need a buyer (hold, vault, login) print a link. Open it, sign in as one of your
+ * The login probe prints a link. Open it, sign in as one of your
  * sandbox *Personal* accounts, approve, and the probe continues. Results go to probes/out/
  * (gitignored) with emails and account IDs masked; tokens and secrets are never written.
  */
@@ -14,26 +14,12 @@ import { createServer, type Server } from "node:http";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { randomBytes, randomUUID } from "node:crypto";
 import { PayPalClient, PayPalError } from "../src/paypal/client.ts";
-import {
-  approvalLink,
-  authorizeOrder,
-  captureAuthorization,
-  createHoldOrder,
-  createVaultedHoldOrder,
-  firstAuthorization,
-  getAuthorization,
-  getOrder,
-  refundCapture,
-  voidAuthorization,
-} from "../src/paypal/orders.ts";
-import { createPayPalSetupToken, createPaymentToken, deletePaymentToken } from "../src/paypal/vault.ts";
 import { createPayoutBatch, getPayoutBatch } from "../src/paypal/payouts.ts";
 import { listWebhooks, searchTransactions } from "../src/paypal/reporting.ts";
 import { getUserInfo, isVerified, loginUrl } from "../src/paypal/identity.ts";
-import { roundAtOrAfter, verifiedBeacon } from "../src/ballot/drand.ts";
-import { draw } from "../src/ballot/draw.ts";
-import { humanTag } from "../src/ballot/human.ts";
-import { QUICKNET } from "../src/ballot/drand.ts";
+import { auditSample, auditSizeFor, commitDistribution } from "../src/claims/ledger.ts";
+import { QUICKNET, roundAtOrAfter, verifiedBeacon } from "../src/engine/drand.ts";
+import { humanTag } from "../src/engine/human.ts";
 
 type Finding = {
   probe: string;
@@ -77,22 +63,28 @@ const probes: Record<string, () => Promise<Omit<Finding, "probe" | "at">>> = {
     const fetchMs = Math.round(performance.now() - started);
 
     const secret = randomBytes(32);
-    const entries = Array.from({ length: 10_000 }, (_, i) => ({
-      entryId: `entry_${String(i).padStart(5, "0")}`,
-      humanTag: humanTag(secret, "probe_ballot", `PAYER${i}`),
-      quantity: 1 + (i % 2),
+    const payouts = Array.from({ length: 10_000 }, (_, i) => ({
+      claimId: `clm_${String(i).padStart(8, "0")}`,
+      humanTag: humanTag(secret, "prg_probe", `PAYER${i}`),
+      amountCents: 1000,
     }));
-    const drawStarted = performance.now();
-    const result = draw(
-      { ballotId: "probe_ballot", inventory: 500, perHumanLimit: 2, allowPartial: false, round: beacon.round, chainHash: QUICKNET.hash },
-      entries,
-      beacon,
-    );
-    const drawMs = Math.round(performance.now() - drawStarted);
+    const terms = {
+      programId: "prg_probe",
+      poolCents: 10_000_000,
+      currency: "USD",
+      shareCents: 1000,
+      auditRound: beacon.round,
+      auditSize: auditSizeFor(payouts.length),
+      chainHash: QUICKNET.hash,
+    };
+    const ledgerStarted = performance.now();
+    const commitment = commitDistribution(terms, payouts);
+    const sample = auditSample(terms, payouts, beacon);
+    const ledgerMs = Math.round(performance.now() - ledgerStarted);
     return {
       ok: true,
-      summary: `round ${beacon.round} verified in ${fetchMs} ms; drew 10,000 entries in ${drawMs} ms`,
-      facts: { round: beacon.round, verifyAndFetchMs: fetchMs, drawMs, selectedUnits: result.selectedUnits, commitment: result.commitment.digest },
+      summary: `round ${beacon.round} verified in ${fetchMs} ms; committed 10,000 payouts and drew a ${sample.length}-claim audit in ${ledgerMs} ms`,
+      facts: { round: beacon.round, verifyAndFetchMs: fetchMs, ledgerMs, auditSize: sample.length, commitment: commitment.digest },
     };
   },
 
@@ -123,11 +115,11 @@ const probes: Record<string, () => Promise<Omit<Finding, "probe" | "at">>> = {
     const batchId = `probe-${randomUUID()}`;
     const batch = await createPayoutBatch(paypal(), {
       senderBatchId: batchId,
-      emailSubject: "Firsthand sandbox probe",
+      emailSubject: "Rightful sandbox probe",
       items: [
-        { itemId: "probe-email", recipientType: "EMAIL", receiver: email, amountCents: 100, note: "Firsthand probe" },
+        { itemId: "probe-email", recipientType: "EMAIL", receiver: email, amountCents: 100, note: "Rightful probe" },
         ...(venmo
-          ? [{ itemId: "probe-venmo", recipientType: "PHONE" as const, receiver: venmo, wallet: "VENMO" as const, amountCents: 100, note: "Firsthand probe" }]
+          ? [{ itemId: "probe-venmo", recipientType: "PHONE" as const, receiver: venmo, wallet: "VENMO" as const, amountCents: 100, note: "Rightful probe" }]
           : []),
       ],
     });
@@ -158,8 +150,8 @@ const probes: Record<string, () => Promise<Omit<Finding, "probe" | "at">>> = {
 
     const batch = await createPayoutBatch(client, {
       senderBatchId: `probe-id-${randomUUID()}`,
-      emailSubject: "Firsthand sandbox probe",
-      items: [{ itemId: "probe-paypal-id", recipientType: "PAYPAL_ID", receiver: payerId, amountCents: 100, note: "Firsthand probe" }],
+      emailSubject: "Rightful sandbox probe",
+      items: [{ itemId: "probe-paypal-id", recipientType: "PAYPAL_ID", receiver: payerId, amountCents: 100, note: "Rightful probe" }],
     });
     const FINAL = new Set(["SUCCESS", "UNCLAIMED", "FAILED", "RETURNED", "BLOCKED", "REFUNDED", "REVERSED", "DENIED"]);
     let status = await getPayoutBatch(client, batch.batch_header.payout_batch_id);
@@ -172,96 +164,6 @@ const probes: Record<string, () => Promise<Omit<Finding, "probe" | "at">>> = {
       ok: item === "SUCCESS",
       summary: `PAYPAL_ID payout to ${mask(payerId)}: batch ${status.batch_header.batch_status}, item ${item}`,
       facts: { recipient: mask(payerId), batchStatus: status.batch_header.batch_status, itemStatus: item },
-    };
-  },
-
-  async hold() {
-    const client = paypal();
-    const entryId = `probe_${randomUUID().slice(0, 8)}`;
-    const order = await createHoldOrder(
-      client,
-      {
-        referenceId: entryId,
-        amountCents: 200,
-        description: "Firsthand probe: approve a $2.00 hold (sandbox)",
-        returnUrl: `${BASE}/return?probe=hold`,
-        cancelUrl: `${BASE}/cancel?probe=hold`,
-      },
-      `hold-${entryId}`,
-    );
-    const link = approvalLink(order);
-    if (!link) throw new Error(`order ${order.id} has no approval link`);
-    const outcome = await waitForBuyer("Approve the $2.00 hold as a sandbox Personal buyer", link, ["/return", "/cancel"]);
-    if (outcome.path === "/cancel") return { ok: false, summary: "buyer cancelled the approval", facts: {} };
-
-    const approved = await getOrder(client, order.id);
-    const authorized = await authorizeOrder(client, order.id, `authorize-${entryId}`);
-    const authorization = firstAuthorization(authorized);
-    if (!authorization) throw new Error("authorize returned no authorization");
-
-    // Exercise every settlement path on one approval: capture part, void the rest, refund the capture.
-    const capture = await captureAuthorization(client, authorization.id, { amountCents: 100, finalCapture: false }, `capture-${entryId}`);
-    await voidAuthorization(client, authorization.id, `void-${entryId}`);
-    const afterVoid = await getAuthorization(client, authorization.id);
-    const refund = await refundCapture(client, capture.id, `refund-${entryId}`);
-
-    const source = approved.payment_source?.paypal ?? authorized.payment_source?.paypal;
-    return {
-      ok: true,
-      summary: `hold authorized → $1 captured → rest voided (${afterVoid.status}) → refunded (${refund.status}); buyer ${source?.account_status ?? "status unknown"}`,
-      facts: {
-        accountStatus: source?.account_status ?? null,
-        accountIdPresent: Boolean(source?.account_id ?? approved.payer?.payer_id),
-        accountId: mask(source?.account_id ?? approved.payer?.payer_id),
-        authorizationStatus: authorization.status,
-        authorizationExpires: authorization.expiration_time ?? null,
-        captureStatus: capture.status,
-        statusAfterVoid: afterVoid.status,
-        refundStatus: refund.status,
-      },
-    };
-  },
-
-  async vault() {
-    const client = paypal();
-    const probeId = randomUUID().slice(0, 8);
-    let setup;
-    try {
-      setup = await createPayPalSetupToken(
-        client,
-        {
-          description: "Firsthand probe: let an agent place ballot holds for you (sandbox)",
-          returnUrl: `${BASE}/return?probe=vault`,
-          cancelUrl: `${BASE}/cancel?probe=vault`,
-        },
-        `setup-${probeId}`,
-      );
-    } catch (err) {
-      if (err instanceof PayPalError) {
-        return { ok: false, summary: `wallet vaulting refused: ${err.issue} (fallback: approve every hold)`, facts: {}, error: errorFacts(err) };
-      }
-      throw err;
-    }
-    const link = approvalLink(setup);
-    if (!link) throw new Error(`setup token ${setup.id} has no approval link`);
-    const outcome = await waitForBuyer("Approve saving PayPal for future ballot holds", link, ["/return", "/cancel"]);
-    if (outcome.path === "/cancel") return { ok: false, summary: "buyer cancelled vault approval", facts: {} };
-
-    const token = await createPaymentToken(client, setup.id, `token-${probeId}`);
-    const order = await createVaultedHoldOrder(
-      client,
-      { referenceId: `probe_${probeId}`, amountCents: 100, description: "Firsthand probe: buyer-not-present hold", vaultId: token.id },
-      `vaulted-hold-${probeId}`,
-    );
-    const authorization = firstAuthorization(order);
-    if (authorization) await voidAuthorization(client, authorization.id, `vaulted-void-${probeId}`);
-    await deletePaymentToken(client, token.id).catch(() => undefined);
-    return {
-      ok: Boolean(authorization),
-      summary: authorization
-        ? `buyer-not-present hold works (order ${order.status}, auth ${authorization.status}, then voided)`
-        : `vaulted order came back ${order.status} without an authorization`,
-      facts: { orderStatus: order.status, authorizationStatus: authorization?.status ?? null },
     };
   },
 
@@ -288,23 +190,23 @@ const probes: Record<string, () => Promise<Omit<Finding, "probe" | "at">>> = {
   },
 
   async jev() {
-    if (!process.env.TYPESAFE_API_KEY) return skip("set TYPESAFE_API_KEY to try System-1 screening");
+    if (!process.env.TYPESAFE_API_KEY) return skip("set TYPESAFE_API_KEY to try System One screening");
     const { TypeSafeClient, choice, noul } = await import("@typesafe-ai/sdk");
     const client = new TypeSafeClient();
     const started = performance.now();
     const response = await client.systemOne({
       state: {
-        entry: {
+        claim: {
           paypalAccountStatus: "VERIFIED",
           accountsSharingThisDevice: 14,
-          entriesFromThisIpInLastMinute: 37,
+          claimsFromThisIpInLastMinute: 37,
           secondsFromPageLoadToSubmit: 0.8,
           userAgent: "HeadlessChrome/131",
         },
       },
       questions: {
-        human: noul("Is this ballot entry most likely made by one real person acting for themselves?"),
-        route: choice("What should the gate do with this entry?", { admit: null, challenge: null, investigate: null }),
+        human: noul("Is this claim most likely filed by one real person acting for themselves?"),
+        route: choice("What should review do with this claim?", { approve: null, challenge: null, investigate: null }),
       },
     });
     const ms = Math.round(performance.now() - started);
@@ -312,7 +214,7 @@ const probes: Record<string, () => Promise<Omit<Finding, "probe" | "at">>> = {
   },
 };
 
-const ORDER = ["token", "drand", "reporting", "webhooks", "payouts", "payout-id", "hold", "vault", "login", "jev"];
+const ORDER = ["token", "drand", "reporting", "webhooks", "payouts", "payout-id", "login", "jev"];
 
 async function main() {
   const requested = process.argv.slice(2).filter((arg) => arg !== "--");

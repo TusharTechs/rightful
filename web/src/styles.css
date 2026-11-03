@@ -221,11 +221,6 @@ main {
   max-width: 70ch;
 }
 
-.ballot-head h1 {
-  font-size: clamp(1.8rem, 4.5vw, 2.6rem);
-  margin: 10px 0;
-}
-
 .facts {
   display: flex;
   flex-wrap: wrap;

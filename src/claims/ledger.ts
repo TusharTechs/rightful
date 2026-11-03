@@ -15,7 +15,7 @@
 import { hmac } from "@noble/hashes/hmac.js";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, concatBytes, hexToBytes, utf8ToBytes } from "@noble/hashes/utils.js";
-import { type InclusionProof, merkleRoot, proveInclusion, verifyInclusion } from "../ballot/commit.ts";
+import { type InclusionProof, merkleRoot, proveInclusion, verifyInclusion } from "../engine/merkle.ts";
 
 /** What the public sees of a payout. `humanTag` is a per-program pseudonym, never a PayPal ID. */
 export type PayoutLeaf = { claimId: string; humanTag: string; amountCents: number };

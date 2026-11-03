@@ -1,32 +1,27 @@
 /**
- * Starts the API. On Render this is the `firsthand-api` web service (`npm start`); locally,
- * `npm run dev:api`, which also runs the clock in-process so ballots move on their own.
+ * Starts the API. On Render this is the `rightful-api` web service (`npm start`); locally,
+ * `npm run dev:api`, which also runs the clock in-process so payouts and audits move on their own.
  */
 
 import { createHash, randomBytes } from "node:crypto";
 import { serve } from "@hono/node-server";
-import { verifiedBeacon } from "../ballot/drand.ts";
-import { tick } from "../ballots/clock.ts";
 import { tickClaims } from "../claims/distribute.ts";
-import { paypalPort } from "../ballots/paypal-port.ts";
-import type { Deps } from "../ballots/service.ts";
+import { payoutsPort } from "../claims/payouts-port.ts";
+import type { ClaimsDeps } from "../claims/service.ts";
 import { openFromEnv } from "../db/db.ts";
+import { FakePayouts } from "../dev/fake-payouts.ts";
+import { verifiedBeacon } from "../engine/drand.ts";
 import { PayPalClient } from "../paypal/client.ts";
 import { getUserInfo } from "../paypal/identity.ts";
-import { type PayoutsPort, payoutsPort } from "../claims/payouts-port.ts";
-import { FakePayPal } from "../dev/fake-paypal.ts";
-import { FakePayouts } from "../dev/fake-payouts.ts";
 import { typeSafeInvestigator } from "../rings/investigators.ts";
 import { createApp } from "./app.ts";
 
-export type Server = { url: string; deps: Deps; adminToken: string; close: () => Promise<void> };
+export type Server = { url: string; deps: ClaimsDeps; adminToken: string; close: () => Promise<void> };
 
 export type Runtime = {
-  deps: Deps;
+  deps: ClaimsDeps;
   /** The real sandbox client; absent in PAYPAL_MODE=fake. */
   paypal: PayPalClient | undefined;
-  fakePayPal: FakePayPal | undefined;
-  payouts: PayoutsPort;
   publicBase: string;
   production: boolean;
   adminToken: string;
@@ -51,45 +46,33 @@ export async function buildRuntime(env: NodeJS.ProcessEnv = process.env): Promis
   const fake = env.PAYPAL_MODE === "fake";
   if (fake && production) throw new Error("PAYPAL_MODE=fake is for local development only");
   const paypal = fake ? undefined : PayPalClient.fromEnv(env);
-  const fakePayPal = fake ? new FakePayPal(`${publicBase}/dev/fake-paypal`) : undefined;
-  const deps: Deps = {
+  const deps: ClaimsDeps = {
     db: await openFromEnv(env),
-    paypal: fakePayPal ?? paypalPort(paypal!),
     humanSecret,
-    beacon: verifiedBeacon,
     now: () => new Date(),
-    returnBase: `${publicBase}/paypal`,
+    payouts: paypal ? payoutsPort(paypal) : new FakePayouts(),
+    // The ring investigator runs only with a TypeSafe key; without one, rings carry evidence alone.
+    investigator: env.TYPESAFE_API_KEY ? typeSafeInvestigator() : undefined,
+    beacon: verifiedBeacon,
   };
-  const payouts = paypal ? payoutsPort(paypal) : new FakePayouts();
-  return { deps, paypal, fakePayPal, payouts, publicBase, production, adminToken };
+  return { deps, paypal, publicBase, production, adminToken };
 }
 
 export async function startServer(env: NodeJS.ProcessEnv = process.env, options: { clock?: boolean } = {}): Promise<Server> {
-  const { deps, paypal, fakePayPal, payouts, publicBase, production, adminToken } = await buildRuntime(env);
+  const { deps, paypal, publicBase, adminToken } = await buildRuntime(env);
 
   // Log in with PayPal needs a public https return URL registered on the app (localhost is refused).
   const redirectUri = !paypal
     ? undefined
     : env.PAYPAL_LIPP_REDIRECT_URI || (publicBase.startsWith("https://") ? `${publicBase}/auth/paypal/callback` : undefined);
-  // Exact origins only. A pattern such as "firsthand-web*.onrender.com" would trust names anyone can
-  // register on Render, so the fan app's real address is configured explicitly.
-  const webOrigins: (string | RegExp)[] = [
-    ...(env.WEB_ORIGINS ?? "").split(",").map((o) => o.trim().replace(/\/$/, "")).filter(Boolean),
-    ...(production ? [] : [/^http:\/\/(localhost|127\.0\.0\.1):\d+$/]),
-  ];
   const app = createApp(deps, {
     adminToken,
-    webOrigins,
     publicBase,
-    payouts,
-    // The ring investigator runs only with a TypeSafe key; without one, rings carry evidence alone.
-    investigator: env.TYPESAFE_API_KEY ? typeSafeInvestigator() : undefined,
-    fakePayPal,
     login: redirectUri && paypal
       ? {
           clientId: paypal.clientId,
           redirectUri,
-          stateKey: createHash("sha256").update("firsthand/login-state-key/v1").update(deps.humanSecret).digest(),
+          stateKey: createHash("sha256").update("rightful/login-state-key/v1").update(deps.humanSecret).digest(),
           exchange: async (code) => getUserInfo(paypal, await paypal.userTokenFromCode(code)),
         }
       : undefined,
@@ -103,11 +86,7 @@ export async function startServer(env: NodeJS.ProcessEnv = process.env, options:
   // Locally there is no cron job, so the API runs the clock itself.
   const clock = options.clock
     ? setInterval(() => {
-        tick(deps).then(
-          (report) => report.errors.forEach((e) => console.error(`clock: ${e.ballot}: ${e.error}`)),
-          (err) => console.error("clock:", err),
-        );
-        tickClaims({ ...deps, payouts }).then(
+        tickClaims(deps).then(
           (report) => report.errors.forEach((e) => console.error(`clock: ${e.program}: ${e.error}`)),
           (err) => console.error("clock:", err),
         );
@@ -135,5 +114,5 @@ function secretBytes(value: string): Buffer {
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const server = await startServer(process.env, { clock: process.env.NODE_ENV !== "production" });
-  console.log(`Firsthand API listening on ${server.url}`);
+  console.log(`Rightful API listening on ${server.url}`);
 }

@@ -1,8 +1,8 @@
 /**
- * Transaction Search and webhooks: how Firsthand checks PayPal's view of the money instead of
+ * Transaction Search and webhooks: how Rightful checks PayPal's view of the money instead of
  * trusting its own. Transaction Search must be switched on for the app, covers at most 31 days per
- * query, and can lag new activity by up to 3 hours, so live state comes from the Orders and
- * Payments APIs and this is used for reconciliation.
+ * query, and can lag new activity by up to 3 hours, so live payout state comes from the
+ * Payouts API and this is used for reconciliation.
  */
 
 import type { PayPalClient } from "./client.ts";

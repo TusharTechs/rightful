@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { PayPalClient, PayPalError } from "../src/paypal/client.ts";
-import { captureAuthorization, createHoldOrder } from "../src/paypal/orders.ts";
+import { createPayoutBatch } from "../src/paypal/payouts.ts";
 
 type Call = { url: string; method: string; headers: Record<string, string>; body: string | undefined };
 type Reply = { status: number; body?: unknown; headers?: Record<string, string> } | Error;
@@ -41,35 +41,32 @@ function client(fake: typeof fetch) {
   return new PayPalClient({ clientId: "id", clientSecret: "secret", fetch: fake, sleep: async () => {} });
 }
 
-const HOLD = {
-  referenceId: "entry_0001",
-  amountCents: 15000,
-  description: "Ballot hold",
-  returnUrl: "http://localhost:5174/return",
-  cancelUrl: "http://localhost:5174/cancel",
+const BATCH = {
+  senderBatchId: "prg_test-1",
+  emailSubject: "Your payment",
+  items: [{ itemId: "clm_00000001", recipientType: "PAYPAL_ID" as const, receiver: "PAYERID123", amountCents: 4878, note: "Your approved claim" }],
 };
 
-test("a hold order is an AUTHORIZE order with integer-cent pricing and an idempotency key", async () => {
-  const { fake, calls } = scriptedFetch([{ status: 201, body: { id: "ORDER1", status: "PAYER_ACTION_REQUIRED" } }]);
-  const order = await createHoldOrder(client(fake), HOLD, "hold-entry_0001");
-  assert.equal(order.id, "ORDER1");
+test("a payout goes to a PayPal account ID in integer-cent pricing, keyed by the batch", async () => {
+  const { fake, calls } = scriptedFetch([{ status: 201, body: { batch_header: { payout_batch_id: "BATCH1", batch_status: "PENDING" } } }]);
+  const batch = await createPayoutBatch(client(fake), BATCH);
+  assert.equal(batch.batch_header.payout_batch_id, "BATCH1");
   const sent = JSON.parse(calls[0]!.body!);
-  assert.equal(sent.intent, "AUTHORIZE");
-  assert.deepEqual(sent.purchase_units[0].amount, { currency_code: "USD", value: "150.00" });
-  assert.equal(sent.payment_source.paypal.experience_context.user_action, "CONTINUE");
-  assert.equal(calls[0]!.headers["PayPal-Request-Id"], "hold-entry_0001");
+  assert.equal(sent.sender_batch_header.sender_batch_id, "prg_test-1");
+  assert.deepEqual(sent.items[0], { recipient_type: "PAYPAL_ID", receiver: "PAYERID123", sender_item_id: "clm_00000001", note: "Your approved claim", amount: { currency: "USD", value: "48.78" } });
+  assert.equal(calls[0]!.headers["PayPal-Request-Id"], "prg_test-1");
 });
 
-test("a retried capture reuses the same PayPal-Request-Id, so it can never capture twice", async () => {
+test("a retried payout reuses the same PayPal-Request-Id, so it can never pay twice", async () => {
   const { fake, calls } = scriptedFetch([
     { status: 503, body: { name: "SERVICE_UNAVAILABLE" } },
     new TypeError("socket hang up"),
-    { status: 201, body: { id: "CAP1", status: "COMPLETED" } },
+    { status: 201, body: { batch_header: { payout_batch_id: "BATCH1", batch_status: "PENDING" } } },
   ]);
-  const capture = await captureAuthorization(client(fake), "AUTH1", { finalCapture: true }, "capture-entry_0001");
-  assert.equal(capture.id, "CAP1");
+  const batch = await createPayoutBatch(client(fake), BATCH);
+  assert.equal(batch.batch_header.payout_batch_id, "BATCH1");
   assert.equal(calls.length, 3);
-  assert.ok(calls.every((call) => call.headers["PayPal-Request-Id"] === "capture-entry_0001"));
+  assert.ok(calls.every((call) => call.headers["PayPal-Request-Id"] === "prg_test-1"));
 });
 
 test("a POST without an idempotency key is not retried", async () => {

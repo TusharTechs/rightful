@@ -20,7 +20,7 @@ test("the callback only trusts a state whose nonce matches the cookie", async ()
   let exchanged = 0;
   mountLogin(app, {
     clientId: "client",
-    redirectUri: "https://firsthand.example/auth/paypal/callback",
+    redirectUri: "https://rightful.example/auth/paypal/callback",
     stateKey: KEY,
     exchange: async () => {
       exchanged++;

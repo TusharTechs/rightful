@@ -1,9 +1,9 @@
 /**
- * Log in with PayPal: the first signal behind "one verified human, one entry".
+ * Log in with PayPal: the first signal behind "one verified PayPal account, one claim".
  *
- * Firsthand asks for the narrowest scopes that answer two questions: is this a verified PayPal
+ * Rightful asks for the narrowest scopes that answer two questions: is this a verified PayPal
  * account, and which account is it. The payer ID never leaves the server; organizers see a
- * per-ballot pseudonym instead (see src/ballot/human.ts).
+ * per-program pseudonym instead (see src/engine/human.ts).
  */
 
 import { SANDBOX_WEB, type PayPalClient } from "./client.ts";

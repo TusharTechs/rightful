@@ -1,63 +1,57 @@
 # AGENTS.md
 
-Guide for AI coding agents working on Firsthand.
+Guide for AI coding agents working on Rightful.
 
 ## What this is
 
-Fair, bot-proof **ballots** for scarce things (tickets, limited drops, popular classes). One verified
-PayPal human gets one entry. Each entry is a PayPal authorization hold: selected fans are captured,
-everyone else is voided and never charged. The order is drawn from a drand quicknet round fixed in
-advance, so anyone can recompute it.
+Settlement and refund **claims** that claim farms cannot drain. One verified PayPal account gets one
+claim per program. An agent may file for a person; the claim waits until that person signs in with
+PayPal and confirms it. Suspected rings are held for a person to decide. Before any money moves, the
+payout ledger is committed under a Merkle root that names a future drand round; payouts then go by
+PayPal Payouts to the exact account that signed in, and the round's randomness picks the audit sample.
 
 ## Map
 
 | Path | Role |
 | --- | --- |
 | `src/paypal/client.ts` | Sandbox-only REST client: token cache, `PayPal-Request-Id` on every money call, retries that reuse it |
-| `src/paypal/orders.ts` | Ballot holds: AUTHORIZE orders, capture, void, reauthorize, refund |
-| `src/paypal/vault.ts`, `payouts.ts`, `reporting.ts`, `identity.ts` | Agent delegations, resale proceeds, reconciliation, Log in with PayPal |
+| `src/paypal/payouts.ts`, `identity.ts`, `reporting.ts` | Payouts, Log in with PayPal, Transaction Search and webhooks (reconciliation) |
 | `src/paypal/money.ts` | Integer minor units ↔ PayPal decimal strings |
-| `src/ballot/commit.ts` | Entry leaves, Merkle root, commitment, inclusion proofs |
-| `src/ballot/draw.ts` | The draw and its verifier (pure functions) |
-| `src/ballot/drand.ts` | Pinned quicknet chain info, verified beacon fetch, round ↔ time |
-| `src/ballot/human.ts` | Per-ballot pseudonyms for payer IDs |
+| `src/engine/` | Shared primitives: Merkle trees and inclusion proofs (`merkle.ts`), pinned drand quicknet (`drand.ts`), per-program pseudonyms for payer IDs (`human.ts`) |
 | `src/db/` | One `Db` interface over Postgres (`DATABASE_URL`) and PGlite (local, tests); `schema.ts` is the ledger |
-| `src/ballots/service.ts` | The lifecycle: create, enter (authorize + verify + one per human), seal, draw, settle, proofs |
-| `src/ballots/paypal-port.ts` | The PayPal slice the service uses; `test/fake-paypal.ts` implements it with idempotent replays |
-| `src/api/` | Hono app (`app.ts`) and server (`main.ts`): REST, PayPal return/cancel, Log in with PayPal (`login.ts`), admin actions |
-| `src/ballots/clock.ts` | `tick` (cron job) and `advance` (when a ballot is being watched): seal, draw, settle on time |
-| `src/dev/` | `PAYPAL_MODE=fake` only: the in-memory PayPal and its stand-in approval page. Refused in production |
-| `web/` | Fan app (Vite + React): ballot page, enter with PayPal, live draw, receipts. Imports `src/ballot/*` to verify proofs and the draw in the browser. Claims payout ledger at `/l/:program` (`?claim=` adds the claimant's receipt), verified with `src/claims/ledger.ts`. Never import server code into it (type-only imports are fine) |
-| `src/claims/` | Rightful claims: programs, filing (web with a claim pass, or agent then bind), one claim per PayPal account, review that holds rings and unverified accounts (`service.ts`); the signed pass and sealed payer ID (`pass.ts`) |
-| `src/claims/ledger.ts` | The public payout ledger: Merkle commitment over (claim, human tag, amount) and terms, made before payouts are sent; the drand-picked audit sample; verifiers. Pure, so the web app can bundle it |
-| `src/claims/distribute.ts`, `payouts-port.ts` | Equal-share distribution by Payouts to `PAYPAL_ID` only (after every ring is decided), item sync, cron tick; `src/dev/fake-payouts.ts` stands in for PayPal |
-| `src/api/claims.ts` | Claim pages after Log in with PayPal, JSON for the web app and agents, organizer review actions |
-| `src/rings/` | Claims ring detection: signal normalizers (`signals.ts`), the deterministic detector (`cluster.ts`), a synthetic program with known rings (`synthetic.ts`) and its scorer (`score.ts`) |
-| `scripts/open-program.ts` | Opens a claims program on a running API and prints the claim and bind links (`npm run open:program`) |
-| `scripts/pay-program.ts` | Reviews, distributes and follows a program's payouts on a running API (`npm run pay:program`) |
-| `src/rings/investigate.ts`, `investigators.ts` | The ring investigator: a case file with stand-in labels (no personal data), three typed questions to TypeSafe, a memo whose facts are computed in code, a fixed deny/review/clear rule. Live, record, or replay from `eval/investigator.jsonl` |
-| `scripts/eval-investigator.ts` | Scores the investigator's triage against the synthetic truth (`npm run eval:investigator`, replay by default) |
-| `scripts/eval-rings.ts` | Offline eval of the detector against a VERIFIED-only baseline (`npm run eval:rings`) |
+| `src/claims/service.ts` | Programs, filing (web with a claim pass, or agent then bind), one claim per PayPal account, review that holds rings and unverified accounts, ring memos, decisions |
+| `src/claims/pass.ts` | The signed claim pass and the sealed (AES-256-GCM) payer ID |
+| `src/claims/ledger.ts` | The public payout ledger: commitment over (claim, human tag, amount) and terms, the drand-picked audit sample, verifiers. Pure, so the web app bundles it |
+| `src/claims/distribute.ts`, `payouts-port.ts` | Equal-share distribution by Payouts to `PAYPAL_ID` only (after every ring is decided), item read-back, the clock's tick, public ledger and receipts |
+| `src/rings/` | Ring detection: signal normalizers (`signals.ts`), the deterministic detector (`cluster.ts`), a synthetic program with known rings (`synthetic.ts`) and its scorer (`score.ts`) |
+| `src/rings/investigate.ts`, `investigators.ts` | The ring investigator: a case file with stand-in labels (no personal data), three typed questions to TypeSafe Jev, a memo whose facts are computed in code, a fixed deny/review/clear rule. Live, record, or replay from `eval/investigator.jsonl` |
+| `src/api/` | Hono app (`app.ts`) and server (`main.ts`); claim pages, agent JSON and admin actions (`claims.ts`); Log in with PayPal (`login.ts`) |
+| `src/dev/fake-payouts.ts` | In-memory Payouts for `PAYPAL_MODE=fake` and tests |
+| `web/` | Web app (Vite + React): programs, the payout ledger at `/l/:program` (`?claim=` adds the claimant's receipt), and the in-browser verifier. Never import server code into it (type-only imports are fine) |
+| `scripts/open-program.ts`, `pay-program.ts` | Drive a running API: open a program and print its links; review, distribute and follow payouts |
+| `scripts/eval-rings.ts`, `eval-investigator.ts` | Offline evals: the detector against a VERIFIED-only baseline; the investigator's triage (replay by default) |
 | `scripts/probe.ts` | Day-0 sandbox probes (`npm run probe -- all`) |
-| `scripts/demo-ballot.ts` | A real ballot on the sandbox, end to end (`npm run demo:ballot`) |
 | `scripts/clock.ts`, `scripts/migrate.ts` | Render cron job (one tick) and pre-deploy migration |
 | `test/` | `node:test` suites (`npm test`) |
-| `docs/architecture.md` | Target Render service layout and the money flow; update it when a service lands |
+| `docs/architecture.md` | Render service layout and the money path; update it when a service lands |
 
 ## Rules
 
-- **Words matter.** It is a *ballot* or *fair queue*. Never write "lottery", "raffle" or "sweepstakes" in
-  code, UI or docs: PayPal's Acceptable Use Policy restricts those. No entry fee, ever.
 - **Sandbox only.** `PayPalClient.fromEnv` refuses anything else. Do not add a live switch.
 - **Money is integers.** Amounts are minor units (`number` of cents) until `toMoney` at the PayPal edge.
   Models never compute, round or choose amounts or payees.
-- **Every money-moving call gets an idempotency key** derived from our own IDs (entry, listing), never
+- **Pay only the account that signed in.** Payouts use `recipient_type: PAYPAL_ID` with the sealed payer
+  ID from the claim. Never add an email or phone fallback.
+- **Every money-moving call gets an idempotency key** derived from our own IDs (program, claim), never
   from the clock or a random value generated at retry time.
-- **AI never decides who is selected or paid.** The draw is `draw()` over the commitment and a verified
-  beacon; payouts follow the committed ledger. AI may screen, investigate and explain; denying a ring
-  needs a person's decision.
-- **Read back from PayPal.** Treat our own state as a cache; confirm holds, captures and voids with GETs.
-  Webhooks can lag by hours in the sandbox, so poll for anything a user is waiting on.
+- **Commit before paying.** The ledger is committed in the same transaction that fixes the share, before
+  any batch is sent. Nothing may change a committed payout.
+- **AI never decides who is paid.** The investigator answers typed questions and the code turns them into
+  a recommendation; denying or clearing a ring needs a person's decision.
+- **Read back from PayPal.** Treat our own state as a cache; confirm payouts with GETs. Webhooks can lag
+  by hours in the sandbox, so poll for anything a person is waiting on.
 - **No secrets or personal data in the repo, logs or fixtures.** Keys live in `.env` (gitignored).
-  Payer IDs never leave the server; organizers and the public see `humanTag` pseudonyms.
+  Payer IDs never leave the server unsealed; organizers and the public see `humanTag` pseudonyms.
+- **Words matter.** Never write "lottery", "raffle" or "sweepstakes" in code, UI or docs (PayPal's
+  Acceptable Use Policy).
 - Before committing, run `npm run typecheck` and `npm test`.

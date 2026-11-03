@@ -1,15 +1,15 @@
 /**
- * Payouts v1: how a fan who resells a ticket at face value gets their money.
+ * Payouts v1: how an approved claimant gets paid, to the PayPal account that signed in.
  *
  * `sender_batch_id` is PayPal's own idempotency key for payouts (duplicates are rejected for 30
- * days), so Firsthand derives it from the listing, never from the clock.
+ * days), so Rightful derives it from the program, never from the clock.
  */
 
 import type { PayPalClient } from "./client.ts";
 import { toMoney } from "./money.ts";
 
 export type PayoutItem = {
-  /** Our ID for the item, e.g. the resale listing. */
+  /** Our ID for the item: the claim. */
   itemId: string;
   recipientType: "EMAIL" | "PHONE" | "PAYPAL_ID";
   receiver: string;
