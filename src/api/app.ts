@@ -12,6 +12,7 @@ import { cors } from "hono/cors";
 import { timeOfRound } from "../ballot/drand.ts";
 import { PayPalError } from "../paypal/client.ts";
 import type { PayoutsPort } from "../claims/payouts-port.ts";
+import type { Investigator } from "../rings/investigate.ts";
 import { ClaimError } from "../claims/service.ts";
 import { claimantAfterLogin, mountClaims } from "./claims.ts";
 import { type LoginConfig, mountLogin } from "./login.ts";
@@ -41,6 +42,8 @@ export type AppOptions = {
   webOrigins?: (string | RegExp)[];
   /** Payouts for claims distribution. */
   payouts?: PayoutsPort;
+  /** Writes memos on suspected rings. */
+  investigator?: Investigator;
   /** The API's public origin, for links handed to agents. */
   publicBase?: string;
   /** Local development only: serve a stand-in PayPal approval page. */
@@ -83,7 +86,7 @@ export function createApp(deps: Deps, options: AppOptions) {
 
   app.get("/health", (c) => c.json({ ok: true }));
 
-  mountClaims(app, { ...deps, payouts: options.payouts }, { admin, publicBase: options.publicBase });
+  mountClaims(app, { ...deps, payouts: options.payouts, investigator: options.investigator }, { admin, publicBase: options.publicBase });
 
   app.post("/api/ballots", admin, async (c) => {
     const body = await c.req.json<Record<string, unknown>>();

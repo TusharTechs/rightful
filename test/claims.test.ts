@@ -10,10 +10,13 @@ import {
   createProgram,
   decideClaims,
   fileClaim,
+  type RingRow,
   getClaim,
+  investigateProgram,
   passAfterLogin,
   reviewProgram,
 } from "../src/claims/service.ts";
+import type { Investigator } from "../src/rings/investigate.ts";
 import { distributeProgram, payoutProof, publicLedger, syncPayouts, tickClaims } from "../src/claims/distribute.ts";
 import { payoutIsInLedger, verifyLedger } from "../src/claims/ledger.ts";
 import { timeOfRound } from "../src/ballot/drand.ts";
@@ -261,4 +264,44 @@ test("approved claims are paid an equal share, by PayPal ID, once, and only afte
   const statuses = await deps.db.query<{ status: string; n: number }>(`select status, count(*)::int as n from claims group by status order by status`);
   assert.deepEqual(Object.fromEntries(statuses.map((r) => [r.status, r.n])), { denied: 5, failed: 1, held: 1, paid: 2 });
   assert.deepEqual((await tickClaims(deps)).synced, [], "done programs are left alone");
+});
+
+test("each ring gets the investigator's memo, and a person's decision outlasts a later review", async () => {
+  const { deps: base, clock, program } = await setup();
+  let calls = 0;
+  let failNext = true;
+  const investigator: Investigator = {
+    async investigate(file) {
+      calls++;
+      if (failNext) {
+        failNext = false;
+        throw new Error("service unavailable");
+      }
+      return { coordinated: file.distinct.devices === 1 ? 0.97 : 0.1, pattern: "device-farm", patternConfidence: 0.9, strength: 3.8, model: "fake" };
+    },
+  };
+  const deps = { ...base, investigator };
+  for (let i = 0; i < 8; i++) await fileClaim(deps, program.id, form(), { via: "web", pass: passAfterLogin(deps, program.id, `G_${i}`, true), ip: `10.${i}.0.1` });
+  for (let i = 0; i < 5; i++) await fileClaim(deps, program.id, form({ device: "farm" }), { via: "web", pass: passAfterLogin(deps, program.id, `F_${i}`, true), ip: `172.16.${i}.1` });
+  clock.now = new Date(T0.getTime() + 3_600_000);
+
+  const report = await reviewProgram(deps, program.id);
+  const ringId = report.rings[0]!.id;
+  assert.match(ringId, /^ring_[0-9a-f]{10}$/);
+  assert.deepEqual(await investigateProgram(deps, program.id), { written: 0, failed: 1 }, "a failed call leaves the ring without a memo");
+  assert.deepEqual(await investigateProgram(deps, program.id), { written: 1, failed: 0 }, "and is retried");
+  assert.deepEqual(await investigateProgram(deps, program.id), { written: 0, failed: 0 }, "a ring with a memo is not asked again");
+  const [ring] = await deps.db.query<RingRow>(`select * from rings where program_id = $1`, [program.id]);
+  assert.equal(ring!.memo!.recommendation, "deny");
+  assert.ok(ring!.memo!.evidence.includes("5 claims came from 1 device."));
+
+  assert.equal(await decideClaims(deps, program.id, { ringId }, "approve"), 5);
+  const again = await reviewProgram(deps, program.id);
+  assert.equal(again.rings.length, 0, "the cleared ring is not held again");
+  assert.equal(again.approved, 8);
+  const [decided] = await deps.db.query<RingRow>(`select * from rings where program_id = $1`, [program.id]);
+  assert.equal(decided!.decision, "approve");
+  const approved = await deps.db.query<{ n: number }>(`select count(*)::int as n from claims where status = 'approved'`);
+  assert.equal(approved[0]!.n, 13);
+  assert.equal(calls, 2);
 });

@@ -33,11 +33,18 @@ const program = await call<{ status: string; title: string; poolCents: number }>
 console.log(`${program.title}: ${program.status}, pool $${(program.poolCents / 100).toFixed(2)}`);
 
 if (program.status === "open" || program.status === "review") {
-  const review = await call<{ rings: { id: string; claimIds: string[] }[]; held: Record<string, number>; approved: number; unbound: number }>(
+  const review = await call<{ rings: { id: string; claimIds: string[] }[]; held: Record<string, number>; approved: number; unbound: number; investigation: { written: number; failed: number } }>(
     "POST",
     `/api/programs/${programId}/review?early=1`,
   );
   console.log(`Review: ${review.approved} approved, held ${JSON.stringify(review.held)}, ${review.unbound} never confirmed by a person`);
+  if (review.rings.length) {
+    const rings = await call<{ id: string; claimIds: string[]; memo: { recommendation: string; evidence: string[]; verdict: { coordinated: number; pattern: string } } | null }[]>("GET", `/api/programs/${programId}/rings`);
+    for (const ring of rings) {
+      const memo = ring.memo ? `investigator: ${ring.memo.recommendation} (${ring.memo.verdict.pattern}, ${Math.round(ring.memo.verdict.coordinated * 100)}% coordinated)` : "no memo";
+      console.log(`  ${ring.id}: ${ring.claimIds.length} claims; ${memo}${ring.memo ? `\n    - ${ring.memo.evidence.join("\n    - ")}` : ""}`);
+    }
+  }
   for (const [decision, list] of [["deny", values.deny], ["approve", values.approve]] as const) {
     for (const ringId of (list ?? "").split(",").filter(Boolean)) {
       const { changed } = await call<{ changed: number }>("POST", `/api/programs/${programId}/decisions`, { ringId, decision });

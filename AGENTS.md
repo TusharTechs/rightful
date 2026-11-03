@@ -35,6 +35,8 @@ advance, so anyone can recompute it.
 | `src/rings/` | Claims ring detection: signal normalizers (`signals.ts`), the deterministic detector (`cluster.ts`), a synthetic program with known rings (`synthetic.ts`) and its scorer (`score.ts`) |
 | `scripts/open-program.ts` | Opens a claims program on a running API and prints the claim and bind links (`npm run open:program`) |
 | `scripts/pay-program.ts` | Reviews, distributes and follows a program's payouts on a running API (`npm run pay:program`) |
+| `src/rings/investigate.ts`, `investigators.ts` | The ring investigator: a case file with stand-in labels (no personal data), three typed questions to TypeSafe, a memo whose facts are computed in code, a fixed deny/review/clear rule. Live, record, or replay from `eval/investigator.jsonl` |
+| `scripts/eval-investigator.ts` | Scores the investigator's triage against the synthetic truth (`npm run eval:investigator`, replay by default) |
 | `scripts/eval-rings.ts` | Offline eval of the detector against a VERIFIED-only baseline (`npm run eval:rings`) |
 | `scripts/probe.ts` | Day-0 sandbox probes (`npm run probe -- all`) |
 | `scripts/demo-ballot.ts` | A real ballot on the sandbox, end to end (`npm run demo:ballot`) |
@@ -51,8 +53,9 @@ advance, so anyone can recompute it.
   Models never compute, round or choose amounts or payees.
 - **Every money-moving call gets an idempotency key** derived from our own IDs (entry, listing), never
   from the clock or a random value generated at retry time.
-- **AI never decides who is selected.** The draw is `draw()` over the commitment and a verified beacon.
-  AI may screen, investigate and explain; bans need a human click.
+- **AI never decides who is selected or paid.** The draw is `draw()` over the commitment and a verified
+  beacon; payouts follow the committed ledger. AI may screen, investigate and explain; denying a ring
+  needs a person's decision.
 - **Read back from PayPal.** Treat our own state as a cache; confirm holds, captures and voids with GETs.
   Webhooks can lag by hours in the sandbox, so poll for anything a user is waiting on.
 - **No secrets or personal data in the repo, logs or fixtures.** Keys live in `.env` (gitignored).

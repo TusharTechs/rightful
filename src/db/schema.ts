@@ -127,6 +127,19 @@ alter table programs add column if not exists audit_sample jsonb;
 
 create index if not exists claims_by_program on claims (program_id, status);
 
+-- Suspected rings from the latest review, the investigator's memo, and a person's decision.
+create table if not exists rings (
+  program_id  text not null references programs (id),
+  id          text not null,
+  claim_ids   jsonb not null,
+  evidence    jsonb not null,
+  memo        jsonb,
+  decision    text check (decision in ('deny', 'approve')),
+  decided_at  timestamptz,
+  created_at  timestamptz not null default now(),
+  primary key (program_id, id)
+);
+
 -- One PayPal account, one claim per program.
 create unique index if not exists claims_one_per_human on claims (program_id, human_tag) where human_tag is not null;
 `;

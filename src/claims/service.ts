@@ -8,8 +8,9 @@
  * - **One claim per account**: the per-program human tag is unique, so a second claim from the same
  *   PayPal account is refused, however it was filed.
  * - **Review**: after close, unverified accounts and suspected rings (`src/rings/cluster.ts`) are
- *   held; everything else is approved. A person confirms or clears each ring. Nothing here denies a
- *   claim on its own.
+ *   held; everything else is approved. The investigator (`src/rings/investigate.ts`) writes a memo
+ *   for each ring, and a person confirms or clears it. Nothing here denies a claim on its own, and a
+ *   later review leaves alone whatever a person already decided.
  */
 
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
@@ -17,6 +18,8 @@ import type { Db } from "../db/db.ts";
 import { humanTag } from "../ballot/human.ts";
 import { isUniqueViolation } from "../ballots/service.ts";
 import { findRings, type Ring } from "../rings/cluster.ts";
+import { type Investigator, type Memo, investigateRing } from "../rings/investigate.ts";
+import type { ClaimSignals } from "../rings/signals.ts";
 import type { PayoutsPort } from "./payouts-port.ts";
 import { type ClaimPass, claimKeys, issuePass, readPass, sealPayee } from "./pass.ts";
 
@@ -27,6 +30,8 @@ export type ClaimsDeps = {
   now: () => Date;
   /** Needed only to distribute. */
   payouts?: PayoutsPort;
+  /** Writes a memo for each suspected ring; without one, rings are reviewed on evidence alone. */
+  investigator?: Investigator;
   /** Fetches and verifies a drand beacon; needed only to draw the audit sample. */
   beacon?: (round: number) => Promise<{ round: number; randomness: string; signature: string }>;
 };
@@ -212,24 +217,21 @@ export async function reviewProgram(deps: ClaimsDeps, programId: string, options
     }
     await tx.query(`update programs set status = 'review', updated_at = now() where id = $1`, [program.id]);
 
+    // A claim a person cleared stays cleared: approved with the ring it was cleared from.
     const claims = await tx.query<ClaimRow>(
-      `select * from claims where program_id = $1 and status in ('filed', 'held', 'approved') order by id`,
+      `select * from claims where program_id = $1 and status in ('filed', 'held', 'approved')
+         and not (status = 'approved' and ring_id is not null) order by id`,
       [program.id],
     );
-    const rings = findRings(
-      claims.map((c) => ({
-        id: c.id,
-        humanTag: c.human_tag ?? c.id,
-        verified: Boolean(c.verified),
-        email: c.email,
-        address: c.address,
-        ip: c.network,
-        device: c.device,
-        filedAt: new Date(c.filed_at).getTime(),
-        narrative: c.narrative,
-      })),
-      { sampleText: program.sample_text },
-    );
+    const rings = findRings(claims.map(signalsOf), { sampleText: program.sample_text }).map((ring) => ({ ...ring, id: ringIdFor(ring.claimIds) }));
+    await tx.query(`delete from rings where program_id = $1 and decision is null`, [program.id]);
+    for (const ring of rings) {
+      const { claimIds, ...evidence } = ring;
+      await tx.query(
+        `insert into rings (program_id, id, claim_ids, evidence) values ($1, $2, $3::jsonb, $4::jsonb) on conflict (program_id, id) do nothing`,
+        [program.id, ring.id, JSON.stringify(claimIds), JSON.stringify(evidence)],
+      );
+    }
     const ringOf = new Map(rings.flatMap((ring) => ring.claimIds.map((id) => [id, ring.id] as const)));
 
     let approved = 0;
@@ -253,6 +255,40 @@ export async function reviewProgram(deps: ClaimsDeps, programId: string, options
   });
 }
 
+export type RingRow = {
+  program_id: string;
+  id: string;
+  claim_ids: string[];
+  evidence: Omit<Ring, "claimIds">;
+  memo: Memo | null;
+  decision: "deny" | "approve" | null;
+  decided_at: Date | null;
+};
+
+/**
+ * Writes the investigator's memo for every undecided ring that has none yet. A failed call leaves
+ * that ring without a memo (a person can still decide it) and is retried on the next run.
+ */
+export async function investigateProgram(deps: ClaimsDeps, programId: string): Promise<{ written: number; failed: number }> {
+  const result = { written: 0, failed: 0 };
+  if (!deps.investigator) return result;
+  const program = await getProgram(deps.db, programId);
+  const rings = await deps.db.query<RingRow>(`select * from rings where program_id = $1 and memo is null and decision is null order by id`, [program.id]);
+  for (const row of rings) {
+    const claims = await deps.db.query<ClaimRow>(`select * from claims where id = any($1)`, [row.claim_ids]);
+    const ring: Ring = { ...row.evidence, id: row.id, claimIds: row.claim_ids };
+    try {
+      const memo = await investigateRing(deps.investigator, ring, new Map(claims.map((c) => [c.id, signalsOf(c)])), program.sample_text);
+      await deps.db.query(`update rings set memo = $3::jsonb where program_id = $1 and id = $2`, [program.id, row.id, JSON.stringify(memo)]);
+      result.written++;
+    } catch (err) {
+      console.error(`investigate ${row.id}:`, err instanceof Error ? err.message : err);
+      result.failed++;
+    }
+  }
+  return result;
+}
+
 /** A person's decision on held claims: confirm a ring (deny) or clear it (approve). */
 export async function decideClaims(
   deps: ClaimsDeps,
@@ -263,6 +299,12 @@ export async function decideClaims(
   const program = await getProgram(deps.db, programId);
   if (program.status !== "review") throw new ClaimError(`program is ${program.status}, not in review`, "wrong_state");
   const status = decision === "approve" ? "approved" : "denied";
+  if ("ringId" in selection) {
+    await deps.db.query(
+      `update rings set decision = $3, decided_at = now() where program_id = $1 and id = $2 and decision is null`,
+      [program.id, selection.ringId, decision],
+    );
+  }
   const rows =
     "ringId" in selection
       ? await deps.db.query<{ id: string }>(
@@ -286,6 +328,26 @@ export async function getClaim(db: Db, id: string): Promise<ClaimRow> {
   const [row] = await db.query<ClaimRow>(`select * from claims where id = $1`, [id]);
   if (!row) throw new ClaimError(`no claim ${id}`, "not_found");
   return row;
+}
+
+/** What the ring detector sees of a claim. */
+export function signalsOf(claim: ClaimRow): ClaimSignals {
+  return {
+    id: claim.id,
+    humanTag: claim.human_tag ?? claim.id,
+    verified: Boolean(claim.verified),
+    email: claim.email,
+    address: claim.address,
+    ip: claim.network,
+    device: claim.device,
+    filedAt: new Date(claim.filed_at).getTime(),
+    narrative: claim.narrative,
+  };
+}
+
+/** A ring's ID is fixed by its members, so the same ring keeps its ID across reviews. */
+function ringIdFor(claimIds: string[]): string {
+  return `ring_${createHash("sha256").update([...claimIds].sort().join("\n")).digest("hex").slice(0, 10)}`;
 }
 
 /** Only the network a claim came from is kept: the /24 for IPv4, the /48 for IPv6, else "". */

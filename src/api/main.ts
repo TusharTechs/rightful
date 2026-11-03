@@ -16,6 +16,7 @@ import { getUserInfo } from "../paypal/identity.ts";
 import { type PayoutsPort, payoutsPort } from "../claims/payouts-port.ts";
 import { FakePayPal } from "../dev/fake-paypal.ts";
 import { FakePayouts } from "../dev/fake-payouts.ts";
+import { typeSafeInvestigator } from "../rings/investigators.ts";
 import { createApp } from "./app.ts";
 
 export type Server = { url: string; deps: Deps; adminToken: string; close: () => Promise<void> };
@@ -81,6 +82,8 @@ export async function startServer(env: NodeJS.ProcessEnv = process.env, options:
     webOrigins,
     publicBase,
     payouts,
+    // The ring investigator runs only with a TypeSafe key; without one, rings carry evidence alone.
+    investigator: env.TYPESAFE_API_KEY ? typeSafeInvestigator() : undefined,
     fakePayPal,
     login: redirectUri && paypal
       ? {

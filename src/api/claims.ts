@@ -21,7 +21,9 @@ import {
   decideClaims,
   fileClaim,
   getClaim,
+  type RingRow,
   getProgram,
+  investigateProgram,
   passAfterLogin,
   reviewProgram,
 } from "../claims/service.ts";
@@ -58,7 +60,16 @@ export function mountClaims(app: Hono, deps: ClaimsDeps, options: ClaimRoutesOpt
 
   app.post("/api/programs/:id/review", options.admin, async (c) => {
     const report = await reviewProgram(deps, id(c), { early: c.req.query("early") === "1" });
-    return c.json(report);
+    const investigation = await investigateProgram(deps, id(c));
+    return c.json({ ...report, investigation });
+  });
+
+  app.post("/api/programs/:id/investigate", options.admin, async (c) => c.json(await investigateProgram(deps, id(c))));
+
+  app.get("/api/programs/:id/rings", options.admin, async (c) => {
+    await getProgram(deps.db, id(c));
+    const rings = await deps.db.query<RingRow>(`select * from rings where program_id = $1 order by jsonb_array_length(claim_ids) desc, id`, [id(c)]);
+    return c.json(rings.map((r) => ({ id: r.id, claimIds: r.claim_ids, evidence: r.evidence, memo: r.memo, decision: r.decision, decidedAt: r.decided_at })));
   });
 
   app.post("/api/programs/:id/distribute", options.admin, async (c) => c.json(await distributeProgram(deps, id(c))));
