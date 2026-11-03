@@ -25,7 +25,7 @@ import {
   passAfterLogin,
   reviewProgram,
 } from "../claims/service.ts";
-import { distributeProgram, syncPayouts } from "../claims/distribute.ts";
+import { distributeProgram, payoutProof, publicLedger, syncPayouts } from "../claims/distribute.ts";
 import type { LoginIntent } from "./login.ts";
 
 const BIND_COOKIE = "rf_bind";
@@ -95,6 +95,10 @@ export function mountClaims(app: Hono, deps: ClaimsDeps, options: ClaimRoutesOpt
   });
 
   app.get("/api/claims/:id", async (c) => c.json(claimantView(await getClaim(deps.db, id(c)))));
+
+  app.get("/api/programs/:id/ledger", async (c) => c.json(await publicLedger(deps, id(c))));
+
+  app.get("/api/claims/:id/proof", async (c) => c.json(await payoutProof(deps, id(c))));
 
   app.post("/api/claims/:id/bind", async (c) => {
     const body = await c.req.json<{ code?: string; pass?: string }>();
@@ -186,6 +190,8 @@ async function programView(deps: ClaimsDeps, programId: string) {
     sampleText: program.sample_text,
     closesAt: program.closes_at,
     shareCents: program.share_cents,
+    commitment: program.commitment_digest,
+    auditRound: program.audit_round,
     claims: Object.fromEntries(counts.map((row) => [row.status, row.n])),
   };
 }

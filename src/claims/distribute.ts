@@ -2,21 +2,29 @@
  * Paying approved claims: an equal share of the pool, by Payouts, to the account that signed in.
  *
  * - **Distribute** starts only once every suspected ring has a person's decision, so no ring is
- *   paid by default. It fixes the share and the batch plan in one transaction, then sends the
- *   batches. Batch IDs come from the program, so a retry after a crash resends the same batches
+ *   paid by default. It fixes the share, the batch plan and the public ledger (`ledger.ts`, with a
+ *   drand round still in the future) in one transaction, then sends the batches. Batch IDs come from the program, so a retry after a crash resends the same batches
  *   and PayPal returns the originals instead of paying twice.
  * - **Sync** reads every item back from PayPal and moves claims to `paid` or `failed`. The cron job
- *   runs it; sandbox webhooks can lag by hours, so polling is the source of truth.
+ *   runs it; sandbox webhooks can lag by hours, so polling is the source of truth. Once the
+ *   committed round is published, sync also draws the audit sample from it.
  *
  * The leftover cents from rounding down stay in the pool; nobody gets a larger share.
  */
 
+import { type InclusionProof } from "../ballot/commit.ts";
+import { QUICKNET, roundAtOrAfter, timeOfRound } from "../ballot/drand.ts";
+import { type DistributionTerms, type LedgerCommitment, type PayoutLeaf, auditSample, auditSizeFor, commitDistribution, provePayout } from "./ledger.ts";
 import { openPayee, claimKeys } from "./pass.ts";
 import { NOT_PAID, PAID, type PayoutsPort } from "./payouts-port.ts";
-import { type ClaimsDeps, type ProgramRow, ClaimError, getProgram } from "./service.ts";
+import { type ClaimsDeps, type ProgramRow, ClaimError, getClaim, getProgram } from "./service.ts";
+import type { Db } from "../db/db.ts";
 
 /** PayPal allows 15,000 items per batch; smaller batches fail and retry in smaller pieces. */
 export const BATCH_SIZE = 5000;
+
+/** The audit round is at least this far after the commitment, so nobody can know it in advance. */
+export const AUDIT_DELAY_MS = 30_000;
 
 export type DistributionReport = {
   programId: string;
@@ -49,9 +57,14 @@ export async function distributeProgram(deps: ClaimsDeps, programId: string): Pr
 
     const batches = Array.from({ length: Math.ceil(count / BATCH_SIZE) }, (_, i) => ({ senderBatchId: `${program.id}-${i + 1}`, batchId: null }));
     await tx.query(`update claims set amount_cents = $2, updated_at = now() where program_id = $1 and status = 'approved'`, [program.id, share]);
+    const auditRound = roundAtOrAfter(new Date(deps.now().getTime() + AUDIT_DELAY_MS));
+    const fixed = { ...program, share_cents: share, audit_round: auditRound, audit_size: auditSizeFor(count) };
+    const commitment = commitDistribution(termsOf(fixed), await ledgerPayouts(tx, program.id));
     const [updated] = await tx.query<ProgramRow>(
-      `update programs set status = 'distributing', share_cents = $2, payout_batches = $3::jsonb, updated_at = now() where id = $1 returning *`,
-      [program.id, share, JSON.stringify(batches)],
+      `update programs set status = 'distributing', share_cents = $2, payout_batches = $3::jsonb, commitment_root = $4,
+                           commitment_digest = $5, audit_round = $6, audit_size = $7, updated_at = now()
+       where id = $1 returning *`,
+      [program.id, share, JSON.stringify(batches), commitment.root, commitment.digest, auditRound, fixed.audit_size],
     );
     return updated!;
   });
@@ -85,11 +98,12 @@ export async function distributeProgram(deps: ClaimsDeps, programId: string): Pr
   };
 }
 
-export type SyncReport = { paid: number; failed: number; pending: number; done: boolean };
+export type SyncReport = { paid: number; failed: number; pending: number; done: boolean; audit: string[] | null };
 
 /** Reads every payout item back from PayPal and records where each claim's money ended up. */
 export async function syncPayouts(deps: ClaimsDeps, programId: string): Promise<SyncReport> {
   const program = await getProgram(deps.db, programId);
+  const audit = await drawAudit(deps, program);
   if (program.status === "distributing") {
     const payouts = payoutsOf(deps);
     for (const batch of program.payout_batches) {
@@ -119,13 +133,83 @@ export async function syncPayouts(deps: ClaimsDeps, programId: string): Promise<
   if (done && program.status !== "done") {
     await deps.db.query(`update programs set status = 'done', updated_at = now() where id = $1 and status = 'distributing'`, [program.id]);
   }
-  return { paid: count("paid"), failed: count("failed"), pending, done };
+  return { paid: count("paid"), failed: count("failed"), pending, done, audit };
 }
 
-/** Programs whose payouts are still moving; the cron job syncs these. */
+/** Draws the audit sample once the committed round is out. Returns the sample, or null if not yet. */
+async function drawAudit(deps: ClaimsDeps, program: ProgramRow): Promise<string[] | null> {
+  if (program.audit_sample) return program.audit_sample;
+  if (!program.audit_round || !deps.beacon || deps.now() < timeOfRound(program.audit_round)) return null;
+  const beacon = await deps.beacon(program.audit_round);
+  const sample = auditSample(termsOf(program), await ledgerPayouts(deps.db, program.id), beacon);
+  await deps.db.query(
+    `update programs set audit_randomness = $2, audit_signature = $3, audit_sample = $4::jsonb, updated_at = now() where id = $1 and audit_sample is null`,
+    [program.id, beacon.randomness, beacon.signature, JSON.stringify(sample)],
+  );
+  return sample;
+}
+
+export type PublicLedger = {
+  terms: DistributionTerms;
+  commitment: LedgerCommitment;
+  payouts: PayoutLeaf[];
+  audit: { round: number; randomness: string; signature: string; sample: string[] } | null;
+};
+
+/** Everything anyone needs to check the distribution. No payer IDs, no personal data. */
+export async function publicLedger(deps: ClaimsDeps, programId: string): Promise<PublicLedger> {
+  const program = await getProgram(deps.db, programId);
+  if (!program.commitment_digest) throw new ClaimError("this program has not distributed yet", "wrong_state");
+  const payouts = await ledgerPayouts(deps.db, program.id);
+  return {
+    terms: termsOf(program),
+    commitment: { root: program.commitment_root!, payoutCount: payouts.length, digest: program.commitment_digest },
+    payouts,
+    audit: program.audit_sample
+      ? { round: program.audit_round!, randomness: program.audit_randomness!, signature: program.audit_signature!, sample: program.audit_sample }
+      : null,
+  };
+}
+
+/** A claimant's receipt: their payout and the path from it to the published root. */
+export async function payoutProof(deps: ClaimsDeps, claimId: string): Promise<{ programId: string; root: string; payout: PayoutLeaf; proof: InclusionProof }> {
+  const claim = await getClaim(deps.db, claimId);
+  const program = await getProgram(deps.db, claim.program_id);
+  if (!program.commitment_root || claim.amount_cents === null || !claim.human_tag) {
+    throw new ClaimError("this claim has no payout in a published ledger", "wrong_state");
+  }
+  const payouts = await ledgerPayouts(deps.db, program.id);
+  const payout = payouts.find((p) => p.claimId === claim.id)!;
+  return { programId: program.id, root: program.commitment_root, payout, proof: provePayout(program.id, payouts, payout) };
+}
+
+function termsOf(program: ProgramRow): DistributionTerms {
+  return {
+    programId: program.id,
+    poolCents: program.pool_cents,
+    currency: program.currency,
+    shareCents: program.share_cents!,
+    auditRound: program.audit_round!,
+    auditSize: program.audit_size!,
+    chainHash: QUICKNET.hash,
+  };
+}
+
+/** Every claim given an amount at distribution, whatever happened to its payout since. */
+async function ledgerPayouts(db: Db, programId: string): Promise<PayoutLeaf[]> {
+  const rows = await db.query<{ id: string; human_tag: string; amount_cents: number }>(
+    `select id, human_tag, amount_cents from claims where program_id = $1 and amount_cents is not null order by id`,
+    [programId],
+  );
+  return rows.map((row) => ({ claimId: row.id, humanTag: row.human_tag, amountCents: row.amount_cents }));
+}
+
+/** Programs whose payouts are still moving, or whose audit is not drawn yet; the cron job syncs these. */
 export async function tickClaims(deps: ClaimsDeps): Promise<{ synced: string[]; errors: { program: string; error: string }[] }> {
   const report = { synced: [] as string[], errors: [] as { program: string; error: string }[] };
-  const rows = await deps.db.query<{ id: string }>(`select id from programs where status = 'distributing' order by id`);
+  const rows = await deps.db.query<{ id: string }>(
+    `select id from programs where status = 'distributing' or (audit_round is not null and audit_sample is null) order by id`,
+  );
   for (const { id } of rows) {
     try {
       await syncPayouts(deps, id);

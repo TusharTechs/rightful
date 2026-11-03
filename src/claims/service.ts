@@ -27,6 +27,8 @@ export type ClaimsDeps = {
   now: () => Date;
   /** Needed only to distribute. */
   payouts?: PayoutsPort;
+  /** Fetches and verifies a drand beacon; needed only to draw the audit sample. */
+  beacon?: (round: number) => Promise<{ round: number; randomness: string; signature: string }>;
 };
 
 export type ProgramStatus = "open" | "review" | "distributing" | "done";
@@ -43,6 +45,13 @@ export type ProgramRow = {
   closes_at: Date;
   share_cents: number | null;
   payout_batches: Array<{ senderBatchId: string; batchId: string | null }>;
+  commitment_root: string | null;
+  commitment_digest: string | null;
+  audit_round: number | null;
+  audit_size: number | null;
+  audit_randomness: string | null;
+  audit_signature: string | null;
+  audit_sample: string[] | null;
 };
 
 export type ClaimRow = {

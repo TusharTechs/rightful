@@ -116,6 +116,14 @@ create table if not exists claims (
 -- Distribution: the equal share each approved claim gets, and the Payouts batches that carry it.
 alter table programs add column if not exists share_cents integer;
 alter table programs add column if not exists payout_batches jsonb not null default '[]'::jsonb;
+-- The public ledger: committed before payouts are sent, with a future drand round for the audit.
+alter table programs add column if not exists commitment_root text;
+alter table programs add column if not exists commitment_digest text;
+alter table programs add column if not exists audit_round integer;
+alter table programs add column if not exists audit_size integer;
+alter table programs add column if not exists audit_randomness text;
+alter table programs add column if not exists audit_signature text;
+alter table programs add column if not exists audit_sample jsonb;
 
 create index if not exists claims_by_program on claims (program_id, status);
 

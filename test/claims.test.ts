@@ -14,7 +14,9 @@ import {
   passAfterLogin,
   reviewProgram,
 } from "../src/claims/service.ts";
-import { distributeProgram, syncPayouts, tickClaims } from "../src/claims/distribute.ts";
+import { distributeProgram, payoutProof, publicLedger, syncPayouts, tickClaims } from "../src/claims/distribute.ts";
+import { payoutIsInLedger, verifyLedger } from "../src/claims/ledger.ts";
+import { timeOfRound } from "../src/ballot/drand.ts";
 import { openPGlite } from "../src/db/db.ts";
 import { FakePayouts } from "../src/dev/fake-payouts.ts";
 import { FakePayPal } from "../src/dev/fake-paypal.ts";
@@ -208,7 +210,8 @@ test("over HTTP: sign in, file; an agent files, its person signs in and confirms
 test("approved claims are paid an equal share, by PayPal ID, once, and only after rings are decided", async () => {
   const { deps: base, clock, program } = await setup();
   const payouts = new FakePayouts();
-  const deps = { ...base, payouts };
+  const beacon = async (round: number) => ({ round, randomness: "ab".repeat(32), signature: "sig" });
+  const deps = { ...base, payouts, beacon };
   for (let i = 0; i < 3; i++) {
     await fileClaim(deps, program.id, form(), { via: "web", pass: passAfterLogin(deps, program.id, `PAY_${i}`, true), ip: `10.${i}.0.1` });
   }
@@ -236,10 +239,25 @@ test("approved claims are paid an equal share, by PayPal ID, once, and only afte
   assert.deepEqual(again.batches, report.batches);
   assert.equal(payouts.sends, 1, "a second run sends nothing new");
 
-  assert.deepEqual(await syncPayouts(deps, program.id), { paid: 0, failed: 0, pending: 3, done: false });
+  const ledger = await publicLedger(deps, program.id);
+  assert.equal(ledger.commitment.payoutCount, 3);
+  assert.ok(timeOfRound(ledger.terms.auditRound).getTime() >= clock.now.getTime() + 30_000, "the audit round was still in the future");
+  assert.equal(ledger.audit, null);
+
+  assert.deepEqual(await syncPayouts(deps, program.id), { paid: 0, failed: 0, pending: 3, done: false, audit: null });
   const tick = await tickClaims(deps);
   assert.deepEqual(tick.synced, [program.id]);
-  assert.deepEqual(await syncPayouts(deps, program.id), { paid: 2, failed: 1, pending: 0, done: true });
+  assert.deepEqual({ ...(await syncPayouts(deps, program.id)), audit: null }, { paid: 2, failed: 1, pending: 0, done: true, audit: null });
+  assert.deepEqual((await tickClaims(deps)).synced, [program.id], "a done program is still ticked until its audit is drawn");
+
+  clock.now = timeOfRound(ledger.terms.auditRound);
+  const { audit } = await syncPayouts(deps, program.id);
+  assert.equal(audit!.length, 3, "three payouts: all are audited");
+  const published = await publicLedger(deps, program.id);
+  assert.deepEqual(verifyLedger(published.terms, published.payouts, { commitment: published.commitment, sample: published.audit!.sample }, published.audit!), []);
+  const receipt = await payoutProof(deps, published.payouts[0]!.claimId);
+  assert.ok(payoutIsInLedger(published.commitment.root, program.id, receipt.payout, receipt.proof));
+  assert.doesNotMatch(JSON.stringify(published), /PAY_|RING_|payee|@example/, "no payer IDs or personal data in the public ledger");
   const statuses = await deps.db.query<{ status: string; n: number }>(`select status, count(*)::int as n from claims group by status order by status`);
   assert.deepEqual(Object.fromEntries(statuses.map((r) => [r.status, r.n])), { denied: 5, failed: 1, held: 1, paid: 2 });
   assert.deepEqual((await tickClaims(deps)).synced, [], "done programs are left alone");

@@ -57,8 +57,12 @@ if (program.status !== "distributing" && program.status !== "done") {
 }
 
 for (let attempt = 0; attempt < 40; attempt++) {
-  const sync = await call<{ paid: number; failed: number; pending: number; done: boolean }>("POST", `/api/programs/${programId}/sync`);
-  console.log(`Payouts: ${sync.paid} paid, ${sync.failed} failed, ${sync.pending} pending`);
-  if (sync.done) break;
+  const sync = await call<{ paid: number; failed: number; pending: number; done: boolean; audit: string[] | null }>("POST", `/api/programs/${programId}/sync`);
+  console.log(`Payouts: ${sync.paid} paid, ${sync.failed} failed, ${sync.pending} pending; audit sample ${sync.audit ? sync.audit.join(", ") : "not drawn yet"}`);
+  if (sync.done && sync.audit) break;
   await new Promise((resolve) => setTimeout(resolve, 15_000));
 }
+
+const ledger = await call<{ commitment: { digest: string; payoutCount: number }; audit: { round: number } | null }>("GET", `/api/programs/${programId}/ledger`);
+console.log(`Ledger ${ledger.commitment.digest.slice(0, 16)}… commits ${ledger.commitment.payoutCount} payouts; audit from drand round ${ledger.audit?.round ?? "(pending)"}.
+Public ledger: ${api}/api/programs/${programId}/ledger`);
