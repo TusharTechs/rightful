@@ -8,7 +8,11 @@
 import type { PayPalClient } from "./client.ts";
 
 export type TransactionSearchPage = {
-  transaction_details?: { transaction_info?: { transaction_id?: string; transaction_event_code?: string } }[];
+  transaction_details?: {
+    transaction_info?: { transaction_id?: string; transaction_event_code?: string; transaction_status?: string };
+    /** The counterparty's PayPal account ID: the same ID Payouts accepts as `PAYPAL_ID`. */
+    payer_info?: { account_id?: string; payer_status?: string };
+  }[];
   total_items?: number;
   total_pages?: number;
 };

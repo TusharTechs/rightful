@@ -144,6 +144,37 @@ const probes: Record<string, () => Promise<Omit<Finding, "probe" | "at">>> = {
     };
   },
 
+  /**
+   * Pays a sandbox buyer by their PayPal account ID (recipient_type PAYPAL_ID), the way a payout is
+   * bound to the exact account that signed in. The ID comes from a past purchase in Transaction
+   * Search, then the item is followed to a final state.
+   */
+  async "payout-id"() {
+    const client = paypal();
+    const end = new Date();
+    const page = await searchTransactions(client, { start: new Date(end.getTime() - 30 * 24 * 3600 * 1000), end, pageSize: 100 });
+    const payerId = page.transaction_details?.map((t) => t.payer_info?.account_id).find((id): id is string => Boolean(id));
+    if (!payerId) return skip("no sandbox purchase with a payer ID in the last 30 days; run the hold probe first");
+
+    const batch = await createPayoutBatch(client, {
+      senderBatchId: `probe-id-${randomUUID()}`,
+      emailSubject: "Firsthand sandbox probe",
+      items: [{ itemId: "probe-paypal-id", recipientType: "PAYPAL_ID", receiver: payerId, amountCents: 100, note: "Firsthand probe" }],
+    });
+    const FINAL = new Set(["SUCCESS", "UNCLAIMED", "FAILED", "RETURNED", "BLOCKED", "REFUNDED", "REVERSED", "DENIED"]);
+    let status = await getPayoutBatch(client, batch.batch_header.payout_batch_id);
+    for (let i = 0; i < 24 && !FINAL.has(status.items?.[0]?.transaction_status ?? ""); i++) {
+      await sleep(5000);
+      status = await getPayoutBatch(client, batch.batch_header.payout_batch_id);
+    }
+    const item = status.items?.[0]?.transaction_status ?? "unknown";
+    return {
+      ok: item === "SUCCESS",
+      summary: `PAYPAL_ID payout to ${mask(payerId)}: batch ${status.batch_header.batch_status}, item ${item}`,
+      facts: { recipient: mask(payerId), batchStatus: status.batch_header.batch_status, itemStatus: item },
+    };
+  },
+
   async hold() {
     const client = paypal();
     const entryId = `probe_${randomUUID().slice(0, 8)}`;
@@ -281,7 +312,7 @@ const probes: Record<string, () => Promise<Omit<Finding, "probe" | "at">>> = {
   },
 };
 
-const ORDER = ["token", "drand", "reporting", "webhooks", "payouts", "hold", "vault", "login", "jev"];
+const ORDER = ["token", "drand", "reporting", "webhooks", "payouts", "payout-id", "hold", "vault", "login", "jev"];
 
 async function main() {
   const requested = process.argv.slice(2).filter((arg) => arg !== "--");
