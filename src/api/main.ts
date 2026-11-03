@@ -74,6 +74,7 @@ export async function startServer(env: NodeJS.ProcessEnv = process.env, options:
   const app = createApp(deps, {
     adminToken,
     webOrigins,
+    publicBase,
     fakePayPal,
     login: redirectUri && paypal
       ? {

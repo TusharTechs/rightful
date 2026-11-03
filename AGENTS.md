@@ -28,7 +28,10 @@ advance, so anyone can recompute it.
 | `src/ballots/clock.ts` | `tick` (cron job) and `advance` (when a ballot is being watched): seal, draw, settle on time |
 | `src/dev/` | `PAYPAL_MODE=fake` only: the in-memory PayPal and its stand-in approval page. Refused in production |
 | `web/` | Fan app (Vite + React): ballot page, enter with PayPal, live draw, receipts. Imports `src/ballot/*` to verify proofs and the draw in the browser; never import server code into it |
+| `src/claims/` | Rightful claims: programs, filing (web with a claim pass, or agent then bind), one claim per PayPal account, review that holds rings and unverified accounts (`service.ts`); the signed pass and sealed payer ID (`pass.ts`) |
+| `src/api/claims.ts` | Claim pages after Log in with PayPal, JSON for the web app and agents, organizer review actions |
 | `src/rings/` | Claims ring detection: signal normalizers (`signals.ts`), the deterministic detector (`cluster.ts`), a synthetic program with known rings (`synthetic.ts`) and its scorer (`score.ts`) |
+| `scripts/open-program.ts` | Opens a claims program on a running API and prints the claim and bind links (`npm run open:program`) |
 | `scripts/eval-rings.ts` | Offline eval of the detector against a VERIFIED-only baseline (`npm run eval:rings`) |
 | `scripts/probe.ts` | Day-0 sandbox probes (`npm run probe -- all`) |
 | `scripts/demo-ballot.ts` | A real ballot on the sandbox, end to end (`npm run demo:ballot`) |

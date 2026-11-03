@@ -11,7 +11,8 @@
  * person to review.
  *
  * Pairs come from blocking keys rather than all n² comparisons: one bucket per device, canonical
- * mailbox and building, sliding time windows inside each /24, and MinHash bands for narratives.
+ * mailbox and building, sliding time windows inside each /24, and MinHash bands for narratives. An
+ * empty key (no fingerprint, unknown network, public webmail) never links anything.
  */
 
 import { type ClaimSignals, canonicalAddress, canonicalEmail, ipPrefix, jaccard, minhash, privateDomain, shingles } from "./signals.ts";
@@ -95,8 +96,8 @@ export function findRings(claims: readonly ClaimSignals[], options: Partial<Dete
     set.add(signal);
   };
   const bucketPairs = (keyOf: (i: number) => string, signal: Signal) => {
-    for (const members of buckets(n, keyOf).values()) {
-      if (members.length > opts.maxBucket) continue;
+    for (const [key, members] of buckets(n, keyOf)) {
+      if (key === "" || members.length > opts.maxBucket) continue;
       for (let x = 0; x < members.length; x++) for (let y = x + 1; y < members.length; y++) note(members[x]!, members[y]!, signal);
     }
   };
@@ -104,9 +105,10 @@ export function findRings(claims: readonly ClaimSignals[], options: Partial<Dete
   bucketPairs((i) => claims[i]!.device, "device");
   bucketPairs((i) => features[i]!.mailbox, "mailbox");
   bucketPairs((i) => features[i]!.building, "building");
-  bucketPairs((i) => features[i]!.domain || `webmail:${i}`, "domain");
+  bucketPairs((i) => features[i]!.domain, "domain");
 
-  for (const members of buckets(n, (i) => features[i]!.network).values()) {
+  for (const [key, members] of buckets(n, (i) => features[i]!.network)) {
+    if (key === "") continue;
     members.sort((a, b) => claims[a]!.filedAt - claims[b]!.filedAt);
     for (let x = 0; x < members.length; x++) {
       for (let y = x + 1; y < members.length; y++) {

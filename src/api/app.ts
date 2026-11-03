@@ -11,6 +11,8 @@ import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
 import { timeOfRound } from "../ballot/drand.ts";
 import { PayPalError } from "../paypal/client.ts";
+import { ClaimError } from "../claims/service.ts";
+import { claimantAfterLogin, mountClaims } from "./claims.ts";
 import { type LoginConfig, mountLogin } from "./login.ts";
 import { advance } from "../ballots/clock.ts";
 import type { FakePayPal } from "../dev/fake-paypal.ts";
@@ -36,13 +38,15 @@ export type AppOptions = {
   login?: LoginConfig;
   /** Origins the web app may ask PayPal to send fans back to. Anything else falls back to API pages. */
   webOrigins?: (string | RegExp)[];
+  /** The API's public origin, for links handed to agents. */
+  publicBase?: string;
   /** Local development only: serve a stand-in PayPal approval page. */
   fakePayPal?: FakePayPal;
 };
 
 export function createApp(deps: Deps, options: AppOptions) {
   const app = new Hono();
-  if (options.login) mountLogin(app, options.login, () => deps.now().getTime());
+  if (options.login) mountLogin(app, { claimant: claimantAfterLogin(deps), ...options.login }, () => deps.now().getTime());
   if (options.fakePayPal) mountFakePayPal(app, options.fakePayPal);
   // The API uses no cookies outside /auth, so any origin may read public data and create entries.
   app.use("/api/*", cors({ origin: "*", allowHeaders: ["content-type", "authorization"], allowMethods: ["GET", "POST"] }));
@@ -54,6 +58,10 @@ export function createApp(deps: Deps, options: AppOptions) {
   app.onError((err, c) => {
     if (err instanceof BallotError) {
       const status = { not_found: 404, closed: 409, wrong_state: 409, invalid: 400, too_early: 425 }[err.code];
+      return c.json({ error: err.code, message: err.message }, status as 400);
+    }
+    if (err instanceof ClaimError) {
+      const status = { not_found: 404, closed: 409, wrong_state: 409, duplicate: 409, invalid: 400, unauthorized: 401 }[err.code];
       return c.json({ error: err.code, message: err.message }, status as 400);
     }
     if (err instanceof PayPalError) {
@@ -71,6 +79,8 @@ export function createApp(deps: Deps, options: AppOptions) {
   };
 
   app.get("/health", (c) => c.json({ ok: true }));
+
+  mountClaims(app, deps, { admin, publicBase: options.publicBase });
 
   app.post("/api/ballots", admin, async (c) => {
     const body = await c.req.json<Record<string, unknown>>();

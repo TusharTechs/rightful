@@ -474,6 +474,6 @@ function newId(prefix: string): string {
   return `${prefix}_${randomBytes(12).toString("base64url")}`;
 }
 
-function isUniqueViolation(err: unknown): boolean {
+export function isUniqueViolation(err: unknown): boolean {
   return typeof err === "object" && err !== null && "code" in err && (err as { code?: string }).code === "23505";
 }
