@@ -65,6 +65,10 @@ alter table programs add column if not exists kind text not null default 'live' 
 alter table claims add column if not exists demo_truth text;
 -- The assistant that filed an agent claim, as it named itself (unverified; shown to the administrator).
 alter table claims add column if not exists agent_name text;
+-- PayPal's transaction ID for the payout, from Payouts read-back; Transaction Search is matched on it.
+alter table claims add column if not exists payout_transaction_id text;
+-- The last reconciliation of a live program's payouts against PayPal's transaction history.
+alter table programs add column if not exists reconciliation jsonb;
 -- The smallest group the ring detector reports. Lower is more sensitive: it also flags households,
 -- which the investigator and a person then clear.
 alter table programs add column if not exists ring_min_size integer not null default 5 check (ring_min_size >= 3);

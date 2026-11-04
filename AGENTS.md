@@ -16,6 +16,8 @@ PayPal Payouts to the exact account that signed in, and the round's randomness p
 | --- | --- |
 | `src/paypal/client.ts` | Sandbox-only REST client: token cache, `PayPal-Request-Id` on every money call, retries that reuse it |
 | `src/paypal/payouts.ts`, `identity.ts`, `reporting.ts` | Payouts, Log in with PayPal, Transaction Search and webhooks (reconciliation) |
+| `src/paypal/sdk.ts` | PayPal's Server SDK (`@paypal/paypal-server-sdk`, APIMatic-generated) for Transaction Search and Balances; Payouts and Log in with PayPal are not in it |
+| `src/claims/reconcile.ts` | Paid claims checked against PayPal's transaction history (pending until it refreshes past the batch), and the funding check before a live program pays |
 | `src/paypal/money.ts` | Integer minor units ↔ PayPal decimal strings |
 | `src/engine/` | Shared primitives: Merkle trees and inclusion proofs (`merkle.ts`), pinned drand quicknet (`drand.ts`), per-program pseudonyms for payer IDs (`human.ts`) |
 | `src/db/` | One `Db` interface over Postgres (`DATABASE_URL`) and PGlite (local, tests); `schema.ts` is the ledger |

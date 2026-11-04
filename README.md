@@ -34,6 +34,10 @@ administrators either pay the fraud or freeze everyone while they investigate.
 - **PayPal keeps a copy.** Every Payouts batch carries the ledger's digest in its message, and every
   payment carries it in its note, so each claimant's own PayPal payment names the ledger it was paid
   from. The verifier checks that PayPal's records, read back from PayPal, all name this ledger.
+- **PayPal's history must agree.** After payouts settle, every paid claim is looked up in PayPal's
+  Transaction Search (through PayPal's Server SDK): a completed debit of exactly the share, under
+  the transaction ID Payouts gave it, with a note naming the ledger. Before a live program pays, a
+  Balances check refuses to start if the account cannot fund it.
 - **Paid to the account that signed in.** PayPal Payouts sends each share with
   `recipient_type: PAYPAL_ID` to the payer ID captured at sign-in, and nowhere else.
 - **An audit nobody picks.** Once the committed drand round is out, its randomness picks the claims to

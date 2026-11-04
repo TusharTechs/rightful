@@ -19,7 +19,9 @@ import { humanTag } from "../engine/human.ts";
 import { findRings, type Ring } from "../rings/cluster.ts";
 import { type Investigator, type Memo, investigateRing } from "../rings/investigate.ts";
 import type { ClaimSignals } from "../rings/signals.ts";
+import type { PayPalReporting } from "../paypal/sdk.ts";
 import type { PayoutsPort } from "./payouts-port.ts";
+import type { Reconciliation } from "./reconcile.ts";
 import { type ClaimPass, claimKeys, issuePass, readPass, sealPayee } from "./pass.ts";
 
 export type ClaimsDeps = {
@@ -31,6 +33,8 @@ export type ClaimsDeps = {
   payouts?: PayoutsPort;
   /** Writes a memo for each suspected ring; without one, rings are reviewed on evidence alone. */
   investigator?: Investigator;
+  /** PayPal's transaction history and balances (the Server SDK); live programs are reconciled and funding-checked with it. */
+  reporting?: PayPalReporting;
   /** Fetches and verifies a drand beacon; needed only to draw the audit sample. */
   beacon?: (round: number) => Promise<{ round: number; randomness: string; signature: string }>;
 };
@@ -63,6 +67,7 @@ export type ProgramRow = {
   audit_sample: string[] | null;
   kind: "live" | "demo";
   ring_min_size: number;
+  reconciliation: Reconciliation | null;
   created_at: Date;
 };
 

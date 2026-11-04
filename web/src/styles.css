@@ -997,3 +997,12 @@ details p {
 .checks .skipped {
   opacity: 0.75;
 }
+
+.history.agrees {
+  border-color: var(--good);
+}
+
+.history.disagrees,
+.history.incomplete {
+  border-color: var(--bad);
+}

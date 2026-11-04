@@ -27,7 +27,7 @@ export type PayoutBatch = {
     batch_status: "PENDING" | "PROCESSING" | "SUCCESS" | "DENIED" | "CANCELED";
     sender_batch_header?: { sender_batch_id?: string; email_subject?: string; email_message?: string };
   };
-  items?: { payout_item_id: string; transaction_status?: string; payout_item?: { sender_item_id?: string; note?: string } }[];
+  items?: { payout_item_id: string; transaction_id?: string; transaction_status?: string; payout_item?: { sender_item_id?: string; note?: string } }[];
 };
 
 export function createPayoutBatch(

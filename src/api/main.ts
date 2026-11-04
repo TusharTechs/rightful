@@ -13,6 +13,7 @@ import { FakePayouts } from "../dev/fake-payouts.ts";
 import { verifiedBeacon } from "../engine/drand.ts";
 import { PayPalClient } from "../paypal/client.ts";
 import { getUserInfo } from "../paypal/identity.ts";
+import { sdkReporting } from "../paypal/sdk.ts";
 import { CachedInvestigator, DEMO_FIXTURES, FIXTURES, loadFixtures, typeSafeInvestigator } from "../rings/investigators.ts";
 import { createApp } from "./app.ts";
 
@@ -51,6 +52,8 @@ export async function buildRuntime(env: NodeJS.ProcessEnv = process.env): Promis
     humanSecret,
     now: () => new Date(),
     payouts: paypal ? payoutsPort(paypal) : new FakePayouts(),
+    // Transaction Search and Balances through PayPal's Server SDK, for reconciliation and funding checks.
+    reporting: paypal ? sdkReporting({ clientId: env.PAYPAL_CLIENT_ID!, clientSecret: env.PAYPAL_CLIENT_SECRET! }) : undefined,
     // Recorded answers first (the demo program's rings are all recorded), then TypeSafe live if a key
     // is set. Without either, a ring carries the detector's evidence alone and a person decides.
     investigator: new CachedInvestigator(

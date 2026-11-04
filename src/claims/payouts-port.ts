@@ -19,7 +19,7 @@ export type PayoutRequest = {
   items: { claimId: string; payerId: string; amountCents: number }[];
 };
 
-export type PayoutItemState = { claimId: string; payoutItemId: string; status: string; note?: string };
+export type PayoutItemState = { claimId: string; payoutItemId: string; status: string; note?: string; transactionId?: string };
 
 /** A batch as PayPal holds it: every item, and the message and time PayPal recorded with it. */
 export type BatchReadback = { items: PayoutItemState[]; emailMessage: string | null; timeCreated: string | null };
@@ -59,7 +59,9 @@ export function payoutsPort(client: PayPalClient): PayoutsPort {
         }
         for (const item of batch.items ?? []) {
           const claimId = item.payout_item?.sender_item_id;
-          if (claimId) out.items.push({ claimId, payoutItemId: item.payout_item_id, status: item.transaction_status ?? "PENDING", note: item.payout_item?.note });
+          if (claimId) {
+            out.items.push({ claimId, payoutItemId: item.payout_item_id, status: item.transaction_status ?? "PENDING", note: item.payout_item?.note, transactionId: item.transaction_id });
+          }
         }
         if ((batch.items ?? []).length < PAGE_SIZE) return out;
       }

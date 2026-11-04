@@ -30,6 +30,7 @@ import {
 } from "../claims/service.ts";
 import { distributeProgram, payoutProof, publicLedger, syncPayouts } from "../claims/distribute.ts";
 import { consoleView, ringMembers } from "../claims/console.ts";
+import { reconcileProgram } from "../claims/reconcile.ts";
 import { createDemoProgram } from "../demo/seed.ts";
 import type { LoginIntent } from "./login.ts";
 import { mountMcp } from "./mcp.ts";
@@ -101,6 +102,9 @@ export function mountClaims(app: Hono, deps: ClaimsDeps, options: ClaimRoutesOpt
   app.post("/api/programs/:id/distribute", options.programAdmin, async (c) => c.json(await distributeProgram(deps, id(c))));
 
   app.post("/api/programs/:id/sync", options.programAdmin, async (c) => c.json(await syncPayouts(deps, id(c))));
+
+  // PayPal's transaction history (Transaction Search) against the paid claims; the clock also runs it.
+  app.post("/api/programs/:id/reconcile", options.programAdmin, async (c) => c.json({ reconciliation: await reconcileProgram(deps, id(c)) }));
 
   app.get("/api/programs/:id/claims", options.programAdmin, async (c) => {
     await getProgram(deps.db, id(c));

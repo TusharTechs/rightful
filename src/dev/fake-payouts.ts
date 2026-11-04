@@ -34,6 +34,7 @@ export class FakePayouts implements PayoutsPort {
         payoutItemId: `${batchId}-ITEM${i + 1}`,
         status: !settled ? "PENDING" : this.failing.has(item.payerId) ? "FAILED" : "SUCCESS",
         note: `Your approved claim. ${batch.request.anchor}`,
+        ...(settled ? { transactionId: `FAKETXN-${batchId}-${i + 1}` } : {}),
       })),
     };
   }

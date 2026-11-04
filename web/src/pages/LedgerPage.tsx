@@ -100,6 +100,8 @@ export function LedgerPage({ id, claimId }: { id: string; claimId: string | null
         </section>
       )}
 
+      {ledger.paypal && <HistoryPanel ledger={ledger} />}
+
       <section className="panel">
         <h2>Audit sample</h2>
         {ledger.audit ? (
@@ -121,5 +123,44 @@ export function LedgerPage({ id, claimId }: { id: string; claimId: string | null
         run={(onStep) => verifyPublishedLedger(ledger, onStep)}
       />
     </article>
+  );
+}
+
+/** What PayPal's own transaction history says about these payouts (Transaction Search, via the API). */
+function HistoryPanel({ ledger }: { ledger: PublicLedger }) {
+  const r = ledger.reconciliation;
+  const refreshed = r?.historyRefreshedAt ? new Date(r.historyRefreshedAt).toLocaleString() : null;
+  return (
+    <section className={`panel history ${r?.state ?? "pending"}`}>
+      <h2>PayPal's transaction history</h2>
+      {!r ? (
+        <p className="muted">Not checked yet. Once payouts settle, the API looks every payment up in PayPal's Transaction Search.</p>
+      ) : r.state === "agrees" ? (
+        <p>
+          <strong>✓ PayPal's history agrees.</strong> All {r.payouts} payouts are in PayPal's own transaction history under the IDs Payouts gave
+          them: completed, exactly the share, each with a note naming this ledger. Checked {new Date(r.checkedAt).toLocaleString()}.
+        </p>
+      ) : r.state === "pending" ? (
+        <p className="muted">
+          Waiting for PayPal's history to catch up ({r.found} of {r.payouts} payouts found so far{refreshed ? `; PayPal last refreshed it ${refreshed}` : ""}). Transaction
+          Search refreshes every few hours; this is checked again every 10 minutes.
+        </p>
+      ) : (
+        <>
+          <p>
+            <strong>{r.state === "incomplete" ? "PayPal's history never caught up" : "✗ PayPal's history disagrees"}</strong> on {r.problems.length} of {r.payouts}{" "}
+            payouts.
+          </p>
+          <ul className="small">
+            {r.problems.slice(0, 10).map((p) => (
+              <li key={p.claimId}>
+                <code>{short(p.claimId, 10)}</code>: {p.problem}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      <p className="muted small">Read from PayPal by the Rightful API with PayPal's Server SDK; your own PayPal payment shows the same note.</p>
+    </section>
   );
 }

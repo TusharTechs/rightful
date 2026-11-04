@@ -21,6 +21,7 @@ import { type ClaimsDeps, type ProgramRow, ClaimError, getClaim, getProgram } fr
 import type { Db } from "../db/db.ts";
 import { simulatedPayouts } from "../demo/simulated-payouts.ts";
 import { pruneDemos } from "../demo/seed.ts";
+import { type Reconciliation, assertFunded, programsToReconcile, reconcileProgram } from "./reconcile.ts";
 
 /** PayPal allows 15,000 items per batch; smaller batches fail and retry in smaller pieces. */
 export const BATCH_SIZE = 5000;
@@ -37,7 +38,13 @@ export type DistributionReport = {
 };
 
 export async function distributeProgram(deps: ClaimsDeps, programId: string): Promise<DistributionReport> {
-  const payouts = payoutsOf(deps, await getProgram(deps.db, programId));
+  const before = await getProgram(deps.db, programId);
+  const payouts = payoutsOf(deps, before);
+  if (before.kind === "live" && before.status === "review") {
+    // Refuse to start a distribution the PayPal account cannot fund (Balances, via the Server SDK).
+    const [approved] = await deps.db.query<{ n: number }>(`select count(*)::int as n from claims where program_id = $1 and status = 'approved'`, [before.id]);
+    if (approved!.n > 0) await assertFunded(deps.reporting, before.currency, Math.floor(before.pool_cents / approved!.n) * approved!.n);
+  }
   const program = await deps.db.transaction(async (tx) => {
     const program = await getProgram(tx, programId, true);
     if (program.status === "distributing") return program;
@@ -129,13 +136,14 @@ export async function syncPayouts(deps: ClaimsDeps, programId: string): Promise<
       if (items.length === 0) continue;
       await deps.db.query(
         `update claims c set payout_item_id = u.item, payout_status = u.status, updated_at = now(),
+                payout_transaction_id = coalesce(nullif(u.txn, ''), c.payout_transaction_id),
                 status = case when c.status <> 'approved' then c.status
                               when u.status = any($5) then 'paid'
                               when u.status = any($6) then 'failed'
                               else c.status end
-         from unnest($2::text[], $3::text[], $4::text[]) as u(id, item, status)
+         from unnest($2::text[], $3::text[], $4::text[], $7::text[]) as u(id, item, status, txn)
          where c.id = u.id and c.program_id = $1`,
-        [program.id, items.map((i) => i.claimId), items.map((i) => i.payoutItemId), items.map((i) => i.status), [...PAID], [...NOT_PAID]],
+        [program.id, items.map((i) => i.claimId), items.map((i) => i.payoutItemId), items.map((i) => i.status), [...PAID], [...NOT_PAID], items.map((i) => i.transactionId ?? "")],
       );
     }
     await deps.db.query(`update programs set payout_batches = $2::jsonb where id = $1`, [program.id, JSON.stringify(batches)]);
@@ -172,6 +180,8 @@ export type PublicLedger = {
   commitment: LedgerCommitment;
   payouts: PayoutLeaf[];
   audit: { round: number; randomness: string; signature: string; sample: string[] } | null;
+  /** PayPal's transaction history checked against the paid claims (live programs; null until checked). */
+  reconciliation: Reconciliation | null;
   /**
    * What PayPal's own records of each batch carry, as read back from PayPal by the API. Null for
    * demo programs, whose payouts are simulated and so have no PayPal record.
@@ -191,6 +201,7 @@ export async function publicLedger(deps: ClaimsDeps, programId: string): Promise
     audit: program.audit_sample
       ? { round: program.audit_round!, randomness: program.audit_randomness!, signature: program.audit_signature!, sample: program.audit_sample }
       : null,
+    reconciliation: program.kind === "demo" ? null : program.reconciliation,
     paypal:
       program.kind === "demo"
         ? null
@@ -248,6 +259,13 @@ export async function tickClaims(deps: ClaimsDeps): Promise<{ synced: string[]; 
       report.synced.push(id);
     } catch (err) {
       report.errors.push({ program: id, error: err instanceof Error ? err.message : String(err) });
+    }
+  }
+  for (const id of await programsToReconcile(deps)) {
+    try {
+      await reconcileProgram(deps, id);
+    } catch (err) {
+      report.errors.push({ program: id, error: `reconcile: ${err instanceof Error ? err.message : String(err)}` });
     }
   }
   try {
