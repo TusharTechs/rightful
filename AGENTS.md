@@ -55,7 +55,7 @@ PayPal Payouts to the exact account that signed in, and the round's randomness p
   by hours in the sandbox, so poll for anything a person is waiting on.
 - **No secrets or personal data in the repo, logs or fixtures.** Keys live in `.env` (gitignored).
   Payer IDs never leave the server unsealed; organizers and the public see `humanTag` pseudonyms.
-- **Words matter.** Never write "lottery", "raffle" or "sweepstakes" in code, UI or docs (PayPal's
+- **Words matter.** Never describe anything here as a game of chance, a prize draw or a sweepstake-style scheme in code, UI or docs (PayPal's
   Acceptable Use Policy).
 - **Demo programs never reach PayPal.** `kind = 'demo'` programs pay through `simulatedPayouts` only, are
   unlisted, and their console token opens nothing else. Never let a demo token act on a live program.

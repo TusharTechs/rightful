@@ -17,15 +17,18 @@ administrators either pay the fraud or freeze everyone while they investigate.
 ## How Rightful works
 
 - **One claim per verified PayPal account.** Claimants sign in with PayPal. The program sees a
-  per-program pseudonym, never the account, and a second claim from the same account is refused.
+  per-program pseudonym, never the PayPal account ID (it is kept only encrypted, to pay), and a second
+  claim from the same account is refused. The email and mailing address on the claim are kept for
+  ring detection and shown to the administrator; the public ledger has neither.
 - **Agents can file; only people get paid.** An assistant can file a claim over the API. It waits,
   unbound, until the person it is for signs in with PayPal and confirms it.
 - **Rings are held, not paid.** Claims that share devices, inboxes, buildings, networks or a scripted
   story are grouped by a deterministic detector. An investigator (TypeSafe Jev, typed answers only)
   rates each group, the memo's facts are computed in code, and a person decides.
-- **The ledger comes first.** Before any money moves, every payout (claim, pseudonym, amount) is
-  hashed into a Merkle root that also commits to a future drand round. Nobody can add a payout or
-  change one afterwards.
+- **The ledger comes first.** Before any payout is sent, every payout (claim, pseudonym, amount) is
+  hashed into a Merkle root that also names a drand round still in the future. Each claimant gets a
+  receipt proving their payout is in it. Once anyone has kept the root or a receipt, adding or
+  changing a payout breaks the match: the ledger is tamper-evident, not tamper-proof.
 - **Paid to the account that signed in.** PayPal Payouts sends each share with
   `recipient_type: PAYPAL_ID` to the payer ID captured at sign-in, and nowhere else.
 - **An audit nobody picks.** Once the committed drand round is out, its randomness picks the claims to
@@ -44,11 +47,23 @@ npm run demo                # seed the demo program in-process and print its rin
 ```
 
 On the demo program (a held-out seed the investigator was never tuned on), the investigator
-recommends denying 50 groups (1,255 ring claims, no real claimant), clearing 25 (96 real claimants,
-no ring claim) and leaves 30 mixed groups to a person. Paying every claim would send $600,000 of the
-$2M to rings; paying every verified account, $551,176; Rightful, after denying the recommended and the mixed
-groups and clearing the rest, $48,025 (rings it never flagged), with each paid claim up from $400 to
-$631.91.
+recommends denying 50 groups (1,255 ring claims, no real claimant) and clearing 25 (96 real
+claimants, no ring claim), and leaves 30 mixed groups (155 ring claims, 77 real claimants) to a
+person:
+
+| How the $2M is paid | Each paid claim | To rings | Real claimants denied |
+| --- | --- | --- | --- |
+| Pay every claim | $400.00 | $600,000 | 0 |
+| Pay every verified PayPal account | $460.08 | $551,176 | 351 (unverified accounts) |
+| Rightful, mixed groups all cleared | $588.75 | $136,001 | 0 |
+| Rightful, mixed groups all denied | $631.91 | $48,025 | 77 |
+
+A person who opens the mixed groups lands between the last two rows. In every Rightful row, 334 real
+claimants with unverified PayPal accounts are held (not denied) until they verify.
+
+**These numbers come from our own synthetic generator** (`src/rings/synthetic.ts`), with known rings
+of four kinds and genuine claimants built to look suspicious (households, dorms, people who paste the
+sample text). They measure the system against that generator, not against real fraud.
 
 ```bash
 npm install

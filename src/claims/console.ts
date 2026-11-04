@@ -27,7 +27,16 @@ export type ConsoleRing = {
   truth?: { ringClaims: number; genuineClaims: number; kind: string };
 };
 
-export type Outcome = { claims: number; shareCents: number; ringClaimsPaid: number; toRingsCents: number; genuineUnpaid: number };
+export type Outcome = {
+  claims: number;
+  shareCents: number;
+  ringClaimsPaid: number;
+  toRingsCents: number;
+  /** Real claimants not paid, for any reason. */
+  genuineUnpaid: number;
+  /** Of those, the ones a person denied (for Rightful) or a rule refused (verified-only: unverified accounts). */
+  genuineDenied: number;
+};
 
 export type ConsoleView = {
   program: {
@@ -136,24 +145,28 @@ export async function consoleView(deps: ClaimsDeps, programId: string): Promise<
 function scoreboard(poolCents: number, tallies: Tally[]): NonNullable<ConsoleView["demo"]> {
   const isRing = (t: Tally) => Boolean(t.demo_truth?.startsWith("ring:"));
   const bound = tallies.filter((t) => t.status !== "unbound");
-  const outcome = (paid: (t: Tally) => boolean): Outcome => {
-    let claims = 0, ringClaimsPaid = 0, genuineUnpaid = 0;
+  const outcome = (paid: (t: Tally) => boolean, denied: (t: Tally) => boolean): Outcome => {
+    let claims = 0, ringClaimsPaid = 0, genuineUnpaid = 0, genuineDenied = 0;
     for (const t of bound) {
       if (paid(t)) {
         claims += t.n;
         if (isRing(t)) ringClaimsPaid += t.n;
-      } else if (!isRing(t)) genuineUnpaid += t.n;
+      } else if (!isRing(t)) {
+        genuineUnpaid += t.n;
+        if (denied(t)) genuineDenied += t.n;
+      }
     }
     const shareCents = claims ? Math.floor(poolCents / claims) : 0;
-    return { claims, shareCents, ringClaimsPaid, toRingsCents: shareCents * ringClaimsPaid, genuineUnpaid };
+    return { claims, shareCents, ringClaimsPaid, toRingsCents: shareCents * ringClaimsPaid, genuineUnpaid, genuineDenied };
   };
   const sum = (pick: (t: Tally) => boolean) => bound.filter(pick).reduce((n, t) => n + t.n, 0);
   return {
     totals: { ringClaims: sum(isRing), genuineClaims: sum((t) => !isRing(t)) },
-    payEveryone: outcome(() => true),
-    verifiedOnly: outcome((t) => Boolean(t.verified)),
+    payEveryone: outcome(() => true, () => false),
+    verifiedOnly: outcome((t) => Boolean(t.verified), (t) => !t.verified),
     // Undecided ring claims are not paid: distribution refuses to start until each ring is decided.
-    rightful: outcome((t) => t.status === "approved" || t.status === "paid" || t.status === "failed"),
+    // Unverified accounts are held, not denied: they are paid once the account is verified.
+    rightful: outcome((t) => t.status === "approved" || t.status === "paid" || t.status === "failed", (t) => t.status === "denied"),
   };
 }
 

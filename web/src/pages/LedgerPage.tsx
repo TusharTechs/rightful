@@ -30,7 +30,7 @@ export function LedgerPage({ id, claimId }: { id: string; claimId: string | null
       <article className="receipt">
         <h1>{program.title}</h1>
         <p className="muted">
-          No payouts yet. The ledger is published here, before any money moves, once claims are reviewed. Pool {money(program.poolCents, program.currency)}.
+          No payouts yet. The ledger appears here once claims are reviewed and every payout is committed. Pool {money(program.poolCents, program.currency)}.
         </p>
       </article>
     );
@@ -75,7 +75,7 @@ export function LedgerPage({ id, claimId }: { id: string; claimId: string | null
               <h2>{inLedger ? `✓ Your ${money(receipt!.payout.amountCents, ledger.terms.currency)} payout is in the ledger` : "✗ Your payout is not in the ledger"}</h2>
               <p className="muted">
                 {inLedger
-                  ? "Checked in your browser: your payout's hash and its Merkle path lead to the commitment published before payouts were sent. Nobody could add a payout, or change yours, afterwards."
+                  ? "Checked in your browser: your payout's hash and its Merkle path lead to this program's commitment, made before payouts were sent. Keep this page: if anyone later added a payout or changed yours, it would no longer lead to the root you see here."
                   : "The proof does not lead to the published commitment. Contact the program administrator."}
                 {audited && " Your claim is in the audit sample."}
               </p>

@@ -296,3 +296,14 @@ test("each ring gets the investigator's memo, and a person's decision outlasts a
   assert.equal(approved[0]!.n, 13);
   assert.equal(calls, 2);
 });
+
+test("agent filings are limited per network and program", async () => {
+  const { deps, program } = await setup();
+  const app = createApp(deps, { adminToken: "admin-token-for-tests" });
+  const file = (ip: string) =>
+    app.request(`/api/programs/${program.id}/claims`, { method: "POST", headers: { "content-type": "application/json", "x-forwarded-for": ip }, body: JSON.stringify(form()) });
+  for (let i = 0; i < 30; i++) assert.equal((await file(`203.0.113.${i + 1}`)).status, 201);
+  assert.equal((await file("203.0.113.200")).status, 429, "the same /24");
+  assert.equal((await file("198.51.100.7")).status, 201, "another network is not affected");
+  await deps.db.close();
+});

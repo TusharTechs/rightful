@@ -18,7 +18,7 @@ export function HomePage() {
         </h1>
         <p className="lede">
           Claim farms file thousands of fake claims and dilute every real one. Rightful pays each verified PayPal account at most once, holds
-          suspected rings for a person to decide, publishes who gets paid what before any money moves, and pays only the account that signed
+          suspected rings for a person to decide, commits who gets paid what before any money moves, and pays only the account that signed
           in.
         </p>
         <DemoButton />
@@ -47,7 +47,7 @@ export function HomePage() {
           </li>
           <li>
             <strong>The ledger comes first.</strong> Before any payout, every payout is hashed into one public commitment that names a future
-            drand round. Nobody can add a payout afterwards.
+            drand round. Change a payout afterwards and every receipt stops matching.
           </li>
           <li>
             <strong>Paid to the account that signed in.</strong> PayPal Payouts sends each share to that account and nowhere else. drand's

@@ -47,7 +47,7 @@ for (const ring of view.rings) {
 for (const [rec, e] of recs) console.log(`  ${rec}: ${e.n} rings, ${e.ring} ring claims, ${e.genuine} genuine claims`);
 const d = view.demo!;
 const show = (name: string, o: typeof d.payEveryone) =>
-  console.log(`  ${name}: ${o.claims} paid, ${money(o.shareCents)} each, ${money(o.toRingsCents)} to rings, ${o.genuineUnpaid} genuine unpaid`);
+  console.log(`  ${name}: ${o.claims} paid, ${money(o.shareCents)} each, ${money(o.toRingsCents)} to rings, ${o.genuineUnpaid} genuine unpaid (${o.genuineDenied} denied)`);
 console.log(`truth: ${d.totals.ringClaims} ring claims, ${d.totals.genuineClaims} genuine`);
 show("pay everyone ", d.payEveryone);
 show("verified only", d.verifiedOnly);

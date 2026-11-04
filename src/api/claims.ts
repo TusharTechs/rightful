@@ -24,6 +24,7 @@ import {
   type RingRow,
   getProgram,
   investigateProgram,
+  networkOf,
   passAfterLogin,
   reviewProgram,
 } from "../claims/service.ts";
@@ -45,6 +46,9 @@ export type ClaimRoutesOptions = {
 
 export function mountClaims(app: Hono, deps: ClaimsDeps, options: ClaimRoutesOptions) {
   const demoLimiter = rateLimiter({ perKey: 6, total: 60, windowMs: 3_600_000 });
+  // Agent filings need no sign-in, so they are limited by network (/24) and overall. A claim filed
+  // this way is never paid until a person binds it, but unlimited filings would flood review.
+  const agentLimiter = rateLimiter({ perKey: 30, total: 600, windowMs: 3_600_000 });
   let demoQueue: Promise<unknown> = Promise.resolve();
   const base = (c: Context) => options.publicBase ?? new URL(c.req.url).origin;
   const secure = (c: Context) => base(c).startsWith("https://");
@@ -135,6 +139,9 @@ export function mountClaims(app: Hono, deps: ClaimsDeps, options: ClaimRoutesOpt
     if (typeof body.pass === "string") {
       const { claim } = await fileClaim(deps, id(c), form, { via: "web", pass: body.pass, ip: clientIp(c) });
       return c.json(claimantView(claim), 201);
+    }
+    if (!agentLimiter.allow(`${id(c)}|${networkOf(clientIp(c))}`, deps.now().getTime())) {
+      return c.json({ error: "rate_limited", message: "Too many unconfirmed claims from this network for this program in the last hour. Have people confirm the ones already filed." }, 429);
     }
     const { claim, bindCode } = await fileClaim(deps, id(c), form, { via: "agent", ip: clientIp(c) });
     const bindUrl = `${base(c)}/claim/bind?claim=${encodeURIComponent(claim.id)}&code=${encodeURIComponent(bindCode!)}`;

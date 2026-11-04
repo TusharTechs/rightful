@@ -291,7 +291,13 @@ function Scoreboard({ demo, currency }: { demo: NonNullable<ConsoleView["demo"]>
           <div className="score-nums">
             <strong>{money(o.shareCents, currency)}</strong> per claim
             <span className={o.toRingsCents ? "bad-text" : "good-text"}>{money(o.toRingsCents, currency)} to rings</span>
-            <span className="muted small">{o.genuineUnpaid.toLocaleString("en-US")} real claimants not paid yet</span>
+            <span className={i === 2 && o.genuineDenied ? "bad-text small" : "muted small"}>
+              {i === 0
+                ? "every real claimant paid, and every ring"
+                : i === 1
+                  ? `${o.genuineDenied.toLocaleString("en-US")} real claimants refused as unverified`
+                  : `${o.genuineDenied.toLocaleString("en-US")} real claimants denied by your decisions · ${(o.genuineUnpaid - o.genuineDenied).toLocaleString("en-US")} waiting on verification or a decision`}
+            </span>
           </div>
         </div>
       ))}

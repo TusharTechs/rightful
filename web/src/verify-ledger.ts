@@ -20,7 +20,7 @@ export async function verifyPublishedLedger(ledger: PublicLedger, onStep: (step:
     ok: committed.length === 0,
     detail:
       committed.length === 0
-        ? `${ledger.payouts.length} payouts of exactly the share, one per person, hash to the commitment ${ledger.commitment.digest.slice(0, 12)}…, published before any money moved. It fixed drand round ${ledger.terms.auditRound} in advance.`
+        ? `${ledger.payouts.length} payouts of exactly the share, one per person, hash to the commitment ${ledger.commitment.digest.slice(0, 12)}…. The commitment fixed drand round ${ledger.terms.auditRound} in advance.`
         : `The published payouts do not match the commitment (${committed.map((m) => m.field).join(", ")}).`,
   });
   if (committed.length) return false;
