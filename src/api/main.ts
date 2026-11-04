@@ -4,6 +4,7 @@
  */
 
 import { createHash, randomBytes } from "node:crypto";
+import { pathToFileURL } from "node:url";
 import { serve } from "@hono/node-server";
 import { tickClaims } from "../claims/distribute.ts";
 import { payoutsPort } from "../claims/payouts-port.ts";
@@ -128,7 +129,8 @@ function secretBytes(value: string): Buffer {
   return bytes;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Compared as URLs so the check also holds on Windows (C:\… paths, file:///C:/… URLs).
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const server = await startServer(process.env, { clock: process.env.NODE_ENV !== "production" });
   console.log(`Rightful API listening on ${server.url}`);
 }
