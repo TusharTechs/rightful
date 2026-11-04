@@ -14,6 +14,7 @@ import { isDemoToken } from "../demo/seed.ts";
 import { PayPalError } from "../paypal/client.ts";
 import { type WebhookVerifier, receivePayPalWebhook } from "../claims/webhooks.ts";
 import { claimantAfterLogin, mountClaims } from "./claims.ts";
+import { openApiDocument } from "./contract.ts";
 import { type LoginConfig, mountLogin } from "./login.ts";
 
 export type AppOptions = {
@@ -71,6 +72,10 @@ export function createApp(deps: ClaimsDeps, options: AppOptions) {
   };
 
   app.get("/health", (c) => c.json({ ok: true }));
+
+  // The public contract (OpenAPI 3.1), generated from the schemas the MCP tools use too.
+  app.use("/openapi.json", cors({ origin: "*", allowMethods: ["GET"] }));
+  app.get("/openapi.json", (c) => c.json(openApiDocument(options.publicBase ?? new URL(c.req.url).origin)));
 
   // PayPal's Payouts notifications: signature checked with PayPal, recorded once, then a read-back.
   app.post("/webhooks/paypal", async (c) => {

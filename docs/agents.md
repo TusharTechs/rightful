@@ -36,7 +36,9 @@ is a label, not an identity: nothing is trusted because of it.
 
 ## Plain HTTP
 
-The same filing path, the same limit:
+The same filing path, the same limit. The full contract is OpenAPI 3.1 at
+[`/openapi.json`](https://rightful-api.onrender.com/openapi.json), generated from the same schemas
+the MCP tools use (`src/api/contract.ts`); a test fails if a documented route or response drifts.
 
 ```bash
 curl -X POST https://rightful-api.onrender.com/api/programs/<programId>/claims \
