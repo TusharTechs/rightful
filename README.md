@@ -28,7 +28,7 @@
 | **Live app** | https://rightful-web.onrender.com | None |
 | **Run a whole $2M settlement** as its administrator: triage 105 groups with AI memos, commit, pay, verify (~10 s to seed) | https://rightful-web.onrender.com → **Run a $2M program as the administrator** | None |
 | **A real sandbox payout**, as its claimant sees it | https://rightful-web.onrender.com/claim/clm_n1bJwZ5ALKjI0c_K | None |
-| **Its receipt and the ledger**, checked in your browser (Merkle root, PayPal's records, drand BLS, audit sample) | https://rightful-web.onrender.com/l/prg_7Gj9VD1w1pfaBqZ_?claim=clm_n1bJwZ5ALKjI0c_K → **Verify in my browser** | None |
+| **Its receipt and the ledger**, checked in your browser (Merkle root, PayPal's records, drand BLS, audit sample); PayPal's transaction history agrees with it | https://rightful-web.onrender.com/l/prg_7Gj9VD1w1pfaBqZ_?claim=clm_n1bJwZ5ALKjI0c_K → **Verify in my browser** | None |
 | **File a claim yourself** (open until Dec 19); sign in again to see a second claim refused | https://rightful-api.onrender.com/claim/start?program=prg_rh4Pg_Ch_CzamLn9 | US sandbox *personal* account |
 | **Let an assistant file for you** (MCP, Streamable HTTP) | `https://rightful-api.onrender.com/mcp` · [docs/agents.md](docs/agents.md) | None |
 | **API contract** (OpenAPI 3.1) | https://rightful-api.onrender.com/openapi.json | None |
