@@ -103,8 +103,8 @@ program (a retry returns the original batch), and the client refuses anything bu
 
 ```mermaid
 flowchart LR
-  person["Claimant (browser)"] -->|Log in with PayPal, file, confirm| api
-  agent["Assistant (MCP or JSON)"] -->|file, follow; never confirm or pay| api
+  person["Claimant (browser)"] -->|"Log in with PayPal, file, confirm"| api
+  agent["Assistant (MCP or JSON)"] -->|"file and follow, never confirm or pay"| api
   web["rightful-web (static): console, ledger, in-browser verifier"] --> api
   api["rightful-api (Render web service)"] --> db[("rightful-db (Postgres)")]
   clock["rightful-clock (Render cron, every minute)"] --> db
