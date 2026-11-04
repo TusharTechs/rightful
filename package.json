@@ -33,6 +33,8 @@
     "@modelcontextprotocol/sdk": "^1.32.2",
     "@noble/hashes": "^2.4.0",
     "@typesafe-ai/sdk": "^0.7.0",
+    "ag-grid-community": "36.2.0",
+    "ag-grid-react": "36.2.0",
     "drand-client": "^1.4.2",
     "hono": "^4.13.13",
     "paypal": "git+https://github.com/context-plugins/paypal-typescript-sdk.git#5d0df8a8817e5fdf2e2cd48e68f790ea4730aab2",

@@ -267,7 +267,7 @@ rightful/
 │   ├── demo/       The hosted $2M demo: seeding, simulated Payouts, pruning
 │   ├── db/         One interface over Postgres and PGlite; the schema
 │   └── dev/        In-memory Payouts for local development and tests
-├── web/            React + Vite app: home, console, claim page, ledger, in-browser verifier
+├── web/            React + Vite app: home, guided tour, console (AG Grid claims table), claim page, ledger, verifier
 ├── test/           node:test suites (70 tests), including evaluation gates and contract checks
 ├── scripts/        Open and pay programs, register the webhook, evals, demo, cron tick, migrations
 ├── eval/           Recorded investigator answers (replayed by the demo and CI)
@@ -344,7 +344,7 @@ repo; it prompts for the PayPal client ID and secret (and, optionally, a TypeSaf
 | AI in the product | **TypeSafe** Jev (typed System-1 API) for the ring investigator |
 | Agents | Model Context Protocol (official TypeScript SDK, Streamable HTTP), OpenAPI 3.1 from zod |
 | Backend | TypeScript, Node.js 22, Hono, Postgres, PGlite, zod |
-| Frontend | React, Vite |
+| Frontend | React, Vite, AG Grid Community (the console's every-claim table) |
 | Integrity | Merkle trees (`@noble/hashes`), drand quicknet with in-browser BLS verification |
 | Quality | node:test, GitHub Actions, CodeQL |
 

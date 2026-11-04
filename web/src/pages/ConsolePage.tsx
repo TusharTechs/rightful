@@ -1,9 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
 import { ApiError, type ConsoleRing, type ConsoleView, type Outcome, type RingMember, consoleApi, tokens } from "../api.ts";
 import { Link } from "../components/Link.tsx";
 import { RingGraph } from "../components/RingGraph.tsx";
 import { StatusPill } from "../components/StatusPill.tsx";
 import { money, short } from "../lib.ts";
+
+/** AG Grid loads only when the administrator opens the table. */
+const ClaimsGrid = lazy(() => import("../components/ClaimsGrid.tsx"));
 
 const PATTERN_LABELS: Record<string, string> = {
   "device-farm": "Device farm",
@@ -50,6 +53,13 @@ function Console({ id, token, onForget }: { id: string; token: string; onForget:
   const [filter, setFilter] = useState<Filter>("all");
   const [open, setOpen] = useState<string | null>(null);
   const [reveal, setReveal] = useState(false);
+  const [table, setTable] = useState(false);
+
+  const openRing = (ringId: string) => {
+    setFilter("all");
+    setOpen(ringId);
+    setTimeout(() => document.getElementById(`ring-${ringId}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  };
 
   const refresh = useCallback(async () => {
     try {
@@ -246,6 +256,26 @@ function Console({ id, token, onForget }: { id: string; token: string; onForget:
         </div>
       </section>
 
+      <section className="panel" data-tour="table">
+        <div className="panel-head">
+          <div>
+            <h2>Every claim</h2>
+            <p className="muted small">
+              All {total.toLocaleString("en-US")} claims in one table: sort, filter and search the evidence, export it, and jump from any claim to its
+              group. Payer IDs are never shown; only the per-program pseudonym exists here.
+            </p>
+          </div>
+          <button className="secondary" onClick={() => setTable(!table)} aria-expanded={table}>
+            {table ? "Hide the table" : `Open the table`}
+          </button>
+        </div>
+        {table && (
+          <Suspense fallback={<p className="muted small">Loading the table…</p>}>
+            <ClaimsGrid load={() => client.claims()} currency={program.currency} reveal={reveal} onOpenRing={openRing} />
+          </Suspense>
+        )}
+      </section>
+
       <PayPanel view={view} busy={busy} onPay={() => act("pay", () => client.distribute())} />
       {error && <p className="notice error">{error.message}</p>}
     </div>
@@ -325,7 +355,7 @@ function RingRow(props: {
   const truthIsRing = ring.truth ? ring.truth.ringClaims >= ring.truth.genuineClaims : null;
 
   return (
-    <div className={`ring ${open ? "open" : ""} ${ring.decision ? "decided" : ""}`}>
+    <div id={`ring-${ring.id}`} className={`ring ${open ? "open" : ""} ${ring.decision ? "decided" : ""}`}>
       <button className="ring-summary" onClick={props.onToggle} aria-expanded={open}>
         <span className="ring-size">{ring.size}</span>
         <span className="ring-main">

@@ -1812,3 +1812,72 @@ details p {
     margin: 0;
   }
 }
+
+/* --- every claim (AG Grid) ------------------------------------------------------------------- */
+
+.claims-grid {
+  margin-top: 12px;
+}
+
+.grid-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.grid-toolbar .text-input {
+  flex: 1;
+  min-width: 240px;
+}
+
+.claims-grid .mono {
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.grid-status {
+  display: inline-block;
+  padding: 1px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 20px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+}
+
+.grid-status.s-paid,
+.grid-status.s-approved {
+  background: var(--good-bg);
+  color: var(--good);
+  border-color: transparent;
+}
+
+.grid-status.s-denied,
+.grid-status.s-failed {
+  background: var(--bad-bg);
+  color: var(--bad);
+  border-color: transparent;
+}
+
+.grid-status.s-held {
+  background: color-mix(in srgb, var(--accent) 14%, var(--card));
+  color: var(--ink);
+  border-color: transparent;
+}
+
+.grid-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.claims-grid .row-denied {
+  opacity: 0.62;
+}

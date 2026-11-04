@@ -46,6 +46,28 @@ export type RingMember = {
 
 export type DemoProgram = Program & { programId: string; token: string };
 
+/** A claim as the administrator sees it (`GET /api/programs/:id/claims`): never the payer ID. */
+export type AdminClaim = {
+  id: string;
+  status: string;
+  hold_reason: "unverified" | "ring" | null;
+  ring_id: string | null;
+  filed_via: "web" | "agent";
+  agent_name: string | null;
+  verified: boolean | null;
+  human_tag: string | null;
+  email: string;
+  address: string;
+  network: string;
+  device: string;
+  narrative: string;
+  amount_cents: number | null;
+  payout_status: string | null;
+  appeal_message: string | null;
+  filed_at: string;
+  demo_truth: string | null;
+};
+
 export type ClaimStatus = {
   id: string;
   programId: string;
@@ -94,6 +116,7 @@ export function consoleApi(programId: string, token: string) {
   return {
     view: () => call<ConsoleView>(`${base}/console`, { headers: auth }),
     members: (ringId: string) => call<RingMember[]>(`${base}/rings/${encodeURIComponent(ringId)}`, { headers: auth }),
+    claims: () => call<AdminClaim[]>(`${base}/claims`, { headers: auth }),
     decide: (ringIds: string[], decision: "deny" | "approve") => post<{ changed: number }>("/decisions", { ringIds, decision }),
     distribute: () => post<{ shareCents: number; claims: number }>("/distribute"),
     sync: () => post<{ paid: number; pending: number; done: boolean; audit: string[] | null }>("/sync"),
