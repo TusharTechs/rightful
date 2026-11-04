@@ -5,21 +5,21 @@ records the reasons. Pieces marked *(planned)* are not built yet.
 
 ```
  Claimants' browsers ─┐                                   ┌─► PayPal: Log in with PayPal (identity)
- Claimants' agents ───┼─► rightful-api (web service) ─────┼─► PayPal: Payouts to PAYPAL_ID
-   (JSON; MCP planned)│     claims · review · ledger      ├─► TypeSafe Jev: ring investigator (typed)
-                      │              │                    └─► drand quicknet: audit randomness
- rightful-web ────────┘              ▼
+ Claimants' agents ───┼─► rightful-api (web service) ─────┼─► PayPal: Payouts to PAYPAL_ID (+ ledger anchor)
+   (JSON and MCP)     │     claims · review · ledger      ├─► TypeSafe Jev: ring investigator (typed)
+                      │     /webhooks/paypal ◄────────────┼── PayPal: Payouts webhooks (verified, then read back)
+ rightful-web ────────┘              ▼                    └─► PayPal Server SDK: Transaction Search, Balances
  (static: programs,          rightful-db (Postgres): programs, claims (payer ID sealed),
-  ledger, verifier)          rings and memos, ledger commitments, audit samples
-                                     ▲
-                       rightful-clock (cron, every minute): payout read-back, audit draws
+  console, ledger,           rings and memos, ledger commitments, audit samples, PayPal events
+  verifier → drand)                  ▲
+                       rightful-clock (cron, every minute): payout read-back, reconciliation, audit draws
 ```
 
 | Service | Type | Job | Why it is separate |
 |---|---|---|---|
 | `rightful-api` | Web service, always on | Claim pages after Log in with PayPal, JSON for agents and the web app, organizer review, distribution, ledgers | Judges never hit a cold start; the build runs the type checker and tests, and a failing build never deploys |
 | `rightful-web` | Static site, PR previews | Programs, the payout ledger, and the in-browser verifier | Needs no server; it bundles the same ledger code the API runs, so verification does not trust the API |
-| `rightful-clock` | Cron job, every minute | Reads payout items back from PayPal; draws audit samples once their drand round is out | Sandbox webhooks can lag by hours, so polling is the source of truth; it runs whether or not anyone is watching |
+| `rightful-clock` | Cron job, every minute | Reads payout items back from PayPal; reconciles paid claims against PayPal's transaction history; draws audit samples once their drand round is out | Sandbox webhooks can lag by hours, so polling is the source of truth; it runs whether or not anyone is watching |
 | `rightful-db` | Postgres, private network only | Source of truth for claims and money state | Paid plan: free databases are deleted after 30 days, and judging runs into December |
 | `rightful-secrets` | Env group | `HUMAN_TAG_SECRET` (pseudonyms, claim passes, sealed payer IDs) and `ADMIN_TOKEN` | Generated once, shared by the API and the clock |
 
