@@ -123,7 +123,13 @@ export async function programsToReconcile(deps: ClaimsDeps): Promise<string[]> {
 /** Before a live program pays: the PayPal account must hold at least what is about to be sent. */
 export async function assertFunded(reporting: PayPalReporting | undefined, currency: string, totalCents: number): Promise<void> {
   if (!reporting) return;
-  const available = await reporting.available(currency);
+  let available: number | null;
+  try {
+    available = await reporting.available(currency);
+  } catch (err) {
+    // Fail closed: if PayPal cannot confirm the balance, nothing is sent (paypal-plan.md, 1b.4).
+    throw new ClaimError(`could not confirm the PayPal balance: ${err instanceof Error ? err.message : String(err)}`, "wrong_state");
+  }
   if (available !== null && available < totalCents) {
     throw new ClaimError(`the PayPal account holds ${available / 100} ${currency}, less than the ${totalCents / 100} ${currency} this program would pay`, "wrong_state");
   }

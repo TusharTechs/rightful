@@ -53,7 +53,7 @@ export async function buildRuntime(env: NodeJS.ProcessEnv = process.env): Promis
     now: () => new Date(),
     payouts: paypal ? payoutsPort(paypal) : new FakePayouts(),
     // Transaction Search and Balances through PayPal's Server SDK, for reconciliation and funding checks.
-    reporting: paypal ? sdkReporting({ clientId: env.PAYPAL_CLIENT_ID!, clientSecret: env.PAYPAL_CLIENT_SECRET! }) : undefined,
+    reporting: paypal ? sdkReporting({ clientId: env.PAYPAL_CLIENT_ID ?? "", clientSecret: env.PAYPAL_CLIENT_SECRET ?? "", environment: env.PAYPAL_ENV }) : undefined,
     // Recorded answers first (the demo program's rings are all recorded), then TypeSafe live if a key
     // is set. Without either, a ring carries the detector's evidence alone and a person decides.
     investigator: new CachedInvestigator(
