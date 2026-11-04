@@ -23,6 +23,8 @@ export type ConsoleRing = {
   lastFiledAt: string;
   memo: Pick<Memo, "recommendation" | "verdict" | "evidence" | "rejected"> | null;
   decision: "deny" | "approve" | null;
+  /** Members who asked for a review. */
+  appeals: number;
   /** Demo programs only: how many members are really ring claims, and of which kind. */
   truth?: { ringClaims: number; genuineClaims: number; kind: string };
 };
@@ -79,6 +81,11 @@ export async function consoleView(deps: ClaimsDeps, programId: string): Promise<
     `select * from rings where program_id = $1 order by jsonb_array_length(claim_ids) desc, id`,
     [program.id],
   );
+  const appealRows = await deps.db.query<{ ring_id: string; n: number }>(
+    `select ring_id, count(*)::int as n from claims where program_id = $1 and ring_id is not null and appealed_at is not null group by ring_id`,
+    [program.id],
+  );
+  const appealsByRing = new Map(appealRows.map((r) => [r.ring_id, r.n]));
 
   const counts: Partial<Record<ClaimStatus, number>> = {};
   const held = { ring: 0, unverified: 0 };
@@ -127,6 +134,7 @@ export async function consoleView(deps: ClaimsDeps, programId: string): Promise<
         lastFiledAt: new Date(row.evidence.lastFiledAt).toISOString(),
         memo: row.memo ? { recommendation: row.memo.recommendation, verdict: row.memo.verdict, evidence: row.memo.evidence, rejected: row.memo.rejected } : null,
         decision: row.decision,
+        appeals: appealsByRing.get(row.id) ?? 0,
         ...(isDemo && truth ? { truth: { ringClaims: truth.ring, genuineClaims: truth.genuine, kind: top.split(":")[1] ?? top } } : {}),
       };
     }),
@@ -181,6 +189,7 @@ export async function ringMembers(deps: ClaimsDeps, programId: string, ringId: s
     status: claim.status,
     filedVia: claim.filed_via,
     agentName: claim.agent_name,
+    appeal: claim.appeal_message,
     verified: claim.verified,
     humanTag: claim.human_tag,
     email: claim.email,

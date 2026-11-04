@@ -69,6 +69,9 @@ alter table claims add column if not exists agent_name text;
 alter table claims add column if not exists payout_transaction_id text;
 -- The last reconciliation of a live program's payouts against PayPal's transaction history.
 alter table programs add column if not exists reconciliation jsonb;
+-- A held claimant's request for a person to look again (once per claim), shown in the console.
+alter table claims add column if not exists appeal_message text;
+alter table claims add column if not exists appealed_at timestamptz;
 -- The smallest group the ring detector reports. Lower is more sensitive: it also flags households,
 -- which the investigator and a person then clear.
 alter table programs add column if not exists ring_min_size integer not null default 5 check (ring_min_size >= 3);

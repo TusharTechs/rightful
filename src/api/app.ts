@@ -20,11 +20,14 @@ export type AppOptions = {
   login?: LoginConfig;
   /** The API's public origin, for links handed to agents. */
   publicBase?: string;
+  /** The web app's origin, for claim status links on the claimant pages. */
+  webBase?: string;
 };
 
 export function createApp(deps: ClaimsDeps, options: AppOptions) {
   const app = new Hono();
-  if (options.login) mountLogin(app, { claimant: claimantAfterLogin(deps), ...options.login }, () => deps.now().getTime());
+  const webBase = (options.webBase ?? "http://localhost:5173").replace(/\/$/, "");
+  if (options.login) mountLogin(app, { claimant: claimantAfterLogin(deps, webBase), webBase, ...options.login }, () => deps.now().getTime());
   // The API uses no cookies outside /auth and /claim, so any origin may read public data and file.
   app.use("/api/*", cors({ origin: "*", allowHeaders: ["content-type", "authorization"], allowMethods: ["GET", "POST"] }));
   // The MCP endpoint is public and cookie-free too, so browser-based MCP clients may call it.
@@ -66,7 +69,7 @@ export function createApp(deps: ClaimsDeps, options: AppOptions) {
 
   app.get("/health", (c) => c.json({ ok: true }));
 
-  mountClaims(app, deps, { admin, programAdmin, publicBase: options.publicBase });
+  mountClaims(app, deps, { admin, programAdmin, publicBase: options.publicBase, webBase });
 
   return app;
 }

@@ -16,12 +16,15 @@ import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
 import type { Context, Hono } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { isVerified, loginUrl, type UserInfo } from "../paypal/identity.ts";
+import { outcomePage } from "./pages.ts";
 
 export type LoginConfig = {
   clientId: string;
   redirectUri: string;
   stateKey: Uint8Array;
   exchange: (code: string) => Promise<UserInfo>;
+  /** The web app's origin, for the wordmark link on sign-in pages. */
+  webBase?: string;
   /** Handles a sign-in that carried an intent, such as filing a claim. */
   claimant?: (c: Context, intent: LoginIntent, info: UserInfo) => Response | Promise<Response>;
 };
@@ -69,18 +72,18 @@ export function mountLogin(app: Hono, config: LoginConfig, now: () => number = D
     const cookieNonce = getCookie(c, COOKIE);
     deleteCookie(c, COOKIE, { path: "/auth/paypal" });
     const error = c.req.query("error");
-    if (error) return c.html(loginPage("PayPal did not sign you in", `PayPal returned: ${error}.`), 400);
+    if (error) return c.html(loginPage(config.webBase, "PayPal did not sign you in", `PayPal returned: ${error}.`), 400);
 
     const state = readState(config.stateKey, c.req.query("state") ?? "", now());
-    if (!state || state.nonce !== cookieNonce) return c.html(loginPage("Sign-in expired", "Please start again."), 400);
+    if (!state || state.nonce !== cookieNonce) return c.html(loginPage(config.webBase, "Sign-in expired", "Please start again."), 400);
     const code = c.req.query("code");
-    if (!code) return c.html(loginPage("Sign-in failed", "PayPal sent no authorization code."), 400);
+    if (!code) return c.html(loginPage(config.webBase, "Sign-in failed", "PayPal sent no authorization code."), 400);
 
     const info = await config.exchange(code);
     if (state.intent && config.claimant) return config.claimant(c, state.intent, info);
     return isVerified(info)
-      ? c.html(loginPage("Verified human ✓", "PayPal confirms this is a verified account."))
-      : c.html(loginPage("Not verified", "PayPal says this account is not verified yet."));
+      ? c.html(loginPage(config.webBase, "Verified human ✓", "PayPal confirms this is a verified account."))
+      : c.html(loginPage(config.webBase, "Not verified", "PayPal says this account is not verified yet."));
   });
 }
 
@@ -88,10 +91,6 @@ function mac(key: Uint8Array, nonce: string, issuedAt: number, carried: string):
   return bytesToHex(hmac(sha256, key, utf8ToBytes(`rightful/login-state/v1\n${nonce}\n${issuedAt}\n${carried}`)));
 }
 
-function loginPage(title: string, message: string) {
-  const escape = (s: string) => s.replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Rightful</title></head>
-<body style="font:16px/1.5 system-ui,sans-serif;max-width:32rem;margin:4rem auto;padding:0 1rem">
-<h1 style="font-size:1.4rem">${escape(title)}</h1><p>${escape(message)}</p></body></html>`;
+function loginPage(webBase: string | undefined, title: string, message: string) {
+  return outcomePage({ title, message, ok: !/expired|failed|did not|not verified/i.test(title), webBase });
 }

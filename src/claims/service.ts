@@ -95,6 +95,8 @@ export type ClaimRow = {
   /** Demo programs only: the synthetic generator's truth, e.g. `ring:device-farm` or `genuine:household`. */
   demo_truth: string | null;
   agent_name: string | null;
+  appeal_message: string | null;
+  appealed_at: Date | null;
 };
 
 export class ClaimError extends Error {
@@ -341,6 +343,24 @@ export async function decideClaims(
           [program.id, selection.claimIds, status],
         );
   return rows.length;
+}
+
+/**
+ * A held claimant asks a person to look again, once, in their own words. It changes nothing by
+ * itself: the claim stays held until the administrator decides its group.
+ */
+export async function appealClaim(deps: ClaimsDeps, claimId: string, message: string): Promise<ClaimRow> {
+  const text = message.replace(/\s+/g, " ").trim();
+  if (text.length < 10 || text.length > 1000) throw new ClaimError("tell the reviewer what they should know, in 10 to 1,000 characters", "invalid");
+  const claim = await getClaim(deps.db, claimId);
+  if (claim.status !== "held") throw new ClaimError("only a held claim can ask for a review", "wrong_state");
+  const [row] = await deps.db.query<ClaimRow>(
+    `update claims set appeal_message = $2, appealed_at = now(), updated_at = now()
+     where id = $1 and status = 'held' and appealed_at is null returning *`,
+    [claim.id, text],
+  );
+  if (!row) throw new ClaimError("this claim has already asked for a review", "duplicate");
+  return row;
 }
 
 export async function getProgram(db: Db, id: string, forUpdate = false): Promise<ProgramRow> {

@@ -342,6 +342,11 @@ function RingRow(props: {
         <span className={`chip chip-${ring.decision ? (ring.decision === "deny" ? "denied" : "cleared") : rec}`}>
           {ring.decision ? (ring.decision === "deny" ? "Denied" : "Cleared") : rec === "deny" ? "Recommend deny" : rec === "clear" ? "Recommend clear" : "Needs a look"}
         </span>
+        {ring.appeals > 0 && (
+          <span className="chip chip-appeal" title="Members of this group asked for a person to look again">
+            {ring.appeals} asked for review
+          </span>
+        )}
         {reveal && ring.truth && (
           <span className={`chip truth ${truthIsRing ? "truth-ring" : "truth-real"}`}>
             {ring.truth.genuineClaims && ring.truth.ringClaims
@@ -428,12 +433,20 @@ function RingDetail({ ring, reveal, disabled, onDecide, loadMembers }: Parameter
                       </span>
                     )}
                     {!m.verified && <span className="tag warn">unverified</span>}
+                    {m.appeal && (
+                      <span className="tag appeal" title={m.appeal}>
+                        asked for review
+                      </span>
+                    )}
                   </td>
                   <td>{m.email}</td>
                   <td>{m.address}</td>
                   <td className="mono">{m.network}.*</td>
                   <td className="mono">{short(m.device, 6).replace("…", "")}</td>
-                  <td className="story">{m.narrative}</td>
+                  <td className="story">
+                    {m.narrative}
+                    {m.appeal && <span className="appeal-text">Their request for review: “{m.appeal}”</span>}
+                  </td>
                   {reveal && <td className="nowrap">{m.truth?.replace(":", " · ")}</td>}
                 </tr>
               ))}

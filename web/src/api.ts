@@ -32,6 +32,7 @@ export type RingMember = {
   status: string;
   filedVia: "web" | "agent";
   agentName?: string | null;
+  appeal?: string | null;
   verified: boolean | null;
   humanTag: string | null;
   email: string;
@@ -44,6 +45,19 @@ export type RingMember = {
 };
 
 export type DemoProgram = Program & { programId: string; token: string };
+
+export type ClaimStatus = {
+  id: string;
+  programId: string;
+  status: "unbound" | "filed" | "held" | "approved" | "denied" | "paid" | "failed";
+  holdReason: "unverified" | "review" | null;
+  filedVia: "web" | "agent";
+  bound: boolean;
+  amountCents: number | null;
+  filedAt: string;
+  appealed: boolean;
+  program: { id: string; title: string; status: ProgramStatus; closesAt: string; kind: "live" | "demo" };
+};
 
 export class ApiError extends Error {
   constructor(
@@ -68,6 +82,8 @@ export const api = {
   ledger: (id: string) => call<PublicLedger>(`/api/programs/${encodeURIComponent(id)}/ledger`),
   payoutReceipt: (claimId: string) => call<PayoutReceipt>(`/api/claims/${encodeURIComponent(claimId)}/proof`),
   createDemo: () => call<DemoProgram>("/api/demo", { method: "POST", body: "{}" }),
+  claim: (id: string) => call<ClaimStatus>(`/api/claims/${encodeURIComponent(id)}`),
+  appeal: (id: string, message: string) => call<ClaimStatus>(`/api/claims/${encodeURIComponent(id)}/appeal`, { method: "POST", body: JSON.stringify({ message }) }),
 };
 
 /** Organizer calls: the admin token, or a demo program's console token. */

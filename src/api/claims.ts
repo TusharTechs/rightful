@@ -16,6 +16,7 @@ import {
   type ClaimRow,
   type ClaimsDeps,
   ClaimError,
+  appealClaim,
   bindClaim,
   createProgram,
   decideClaims,
@@ -34,6 +35,8 @@ import { reconcileProgram } from "../claims/reconcile.ts";
 import { createDemoProgram } from "../demo/seed.ts";
 import type { LoginIntent } from "./login.ts";
 import { mountMcp } from "./mcp.ts";
+import { escape, outcomePage, shell } from "./pages.ts";
+import { humanTag } from "../engine/human.ts";
 
 const BIND_COOKIE = "rf_bind";
 const BIND_TTL_S = 30 * 60;
@@ -44,6 +47,8 @@ export type ClaimRoutesOptions = {
   programAdmin: MiddlewareHandler;
   /** The API's public origin, for links handed to agents. Defaults to the request's origin. */
   publicBase?: string;
+  /** The web app's origin, for claim status links. */
+  webBase: string;
 };
 
 export function mountClaims(app: Hono, deps: ClaimsDeps, options: ClaimRoutesOptions) {
@@ -171,9 +176,20 @@ export function mountClaims(app: Hono, deps: ClaimsDeps, options: ClaimRoutesOpt
     programView: (programId) => programView(deps, programId),
     clientIp,
     base,
+    webBase: options.webBase,
   });
 
-  app.get("/api/claims/:id", async (c) => c.json(claimantView(await getClaim(deps.db, id(c)))));
+  app.get("/api/claims/:id", async (c) => {
+    const claim = await getClaim(deps.db, id(c));
+    const program = await getProgram(deps.db, claim.program_id);
+    return c.json({ ...claimantView(claim), program: { id: program.id, title: program.title, status: program.status, closesAt: program.closes_at, kind: program.kind } });
+  });
+
+  // A held claimant asks for a person to look again (the claim ID is the capability, as on the receipt).
+  app.post("/api/claims/:id/appeal", async (c) => {
+    const body = await c.req.json<{ message?: unknown }>().catch(() => ({}) as { message?: unknown });
+    return c.json(claimantView(await appealClaim(deps, id(c), typeof body.message === "string" ? body.message : "")));
+  });
 
   app.get("/api/programs/:id/ledger", async (c) => c.json(await publicLedger(deps, id(c))));
 
@@ -202,49 +218,90 @@ export function mountClaims(app: Hono, deps: ClaimsDeps, options: ClaimRoutesOpt
         deleteCookie(c, BIND_COOKIE, { path: "/claim" });
         if (cookieClaim !== body.claim) throw new ClaimError("open the link you were sent again to confirm this claim", "unauthorized");
         const claim = await bindClaim(deps, body.claim, code ?? "", body.pass ?? "");
-        return c.html(page("Claim confirmed", `${outcome(claim)} It was filed for you and is now tied to your PayPal account.`, claim.id));
+        return c.html(outcomePage({ title: "Claim confirmed", ok: true, message: `It was filed for you and is now tied to your PayPal account. ${outcome(claim)}`, claimId: claim.id, statusUrl: statusUrl(options.webBase, claim.id), webBase: options.webBase }));
       }
       const { claim } = await fileClaim(deps, body.program ?? "", formOf(body), { via: "web", pass: body.pass ?? "", ip: clientIp(c) });
-      return c.html(page("Claim filed", outcome(claim), claim.id), 201);
+      return c.html(outcomePage({ title: "Claim filed", ok: true, message: outcome(claim), claimId: claim.id, statusUrl: statusUrl(options.webBase, claim.id), webBase: options.webBase }), 201);
     } catch (err) {
-      if (err instanceof ClaimError) return c.html(page("Claim not filed", err.message), err.code === "not_found" ? 404 : 400);
+      if (err instanceof ClaimError) return c.html(outcomePage({ title: "Claim not filed", ok: false, message: sentence(err.message), webBase: options.webBase }), err.code === "not_found" ? 404 : 400);
       throw err;
     }
   });
 }
 
 /** What Log in with PayPal does when the sign-in was for a claim. */
-export function claimantAfterLogin(deps: ClaimsDeps) {
+export function claimantAfterLogin(deps: ClaimsDeps, webBase: string) {
+  const fail = (c: Context, title: string, message: string, status: 400 | 404 | 409 | 502) => c.html(outcomePage({ title, ok: false, message, webBase }), status);
   return async (c: Context, intent: LoginIntent, info: UserInfo): Promise<Response> => {
     const payerId = typeof info.payer_id === "string" ? info.payer_id : "";
-    if (!payerId) return c.html(page("Sign-in incomplete", "PayPal did not share your account ID, so a payout could not be tied to you. Please try again."), 502);
+    if (!payerId) return fail(c, "Sign-in incomplete", "PayPal did not share your account ID, so a payout could not be tied to you. Please try again.", 502);
     try {
       const program = await getProgram(deps.db, intent.program);
-      if (program.status !== "open" || deps.now() >= program.closes_at) return c.html(page(program.title, "This program is closed to new claims."), 409);
-      const pass = passAfterLogin(deps, program.id, payerId, isVerified(info));
-      const note = isVerified(info) ? "" : `<p><strong>PayPal says this account is not verified.</strong> You can still file; the claim will wait until you verify your PayPal account.</p>`;
+      if (program.status !== "open" || deps.now() >= program.closes_at) return fail(c, program.title, "This program is closed to new claims.", 409);
+      const verified = isVerified(info);
+      // One claim per PayPal account: if this account already has one here, show it instead of a form.
+      const [existing] = await deps.db.query<{ id: string }>(
+        `select id from claims where program_id = $1 and human_tag = $2`,
+        [program.id, humanTag(deps.humanSecret, program.id, payerId)],
+      );
+      if (existing) {
+        return c.html(outcomePage({
+          title: "You already have a claim here",
+          ok: true,
+          message: `This PayPal account already has its one claim in ${program.title}. Follow it below; a second claim from the same account is never accepted.`,
+          claimId: existing.id,
+          statusUrl: statusUrl(webBase, existing.id),
+          webBase,
+        }));
+      }
+      const pass = passAfterLogin(deps, program.id, payerId, verified);
+      const account = verified
+        ? `<p><span class="badge good">✓ Verified PayPal account</span></p>`
+        : `<p><span class="badge warn">PayPal account not verified</span></p><p class="small">You can still file. Your claim will wait until you verify your PayPal account, and nothing else is needed from you.</p>`;
+      const promise = `<p class="muted small">One claim per PayPal account. Any payment goes only to the account you just signed in with; nobody else, not even an assistant that helped you, can receive it.</p>`;
       if (intent.claim) {
         const claim = await getClaim(deps.db, intent.claim);
-        if (claim.program_id !== program.id || claim.status !== "unbound") return c.html(page(program.title, "This claim is already confirmed, or it belongs to another program."), 409);
+        if (claim.program_id !== program.id || claim.status !== "unbound") return fail(c, program.title, "This claim is already confirmed, or it belongs to another program.", 409);
         return c.html(shell(program.title, `<h1>Is this your claim?</h1>
-<p>Someone (or an assistant) filed this claim for you. Check it before you confirm: once confirmed, it is your one claim in this program and any payment goes to the PayPal account you just signed in with.</p>${note}
-<dl><dt>Email</dt><dd>${escape(claim.email)}</dd><dt>Address</dt><dd>${escape(claim.address)}</dd><dt>What happened</dt><dd>${escape(claim.narrative)}</dd></dl>
+<p>${claim.agent_name ? `An assistant (it calls itself “${escape(claim.agent_name)}”)` : "Someone, or an assistant,"} filed this claim for you in <strong>${escape(program.title)}</strong>. Check it before you confirm: once confirmed it is your one claim in this program.</p>
+${account}
+<section class="card" aria-label="The claim as filed"><dl><dt>Email</dt><dd>${escape(claim.email)}</dd><dt>Mailing address</dt><dd>${escape(claim.address)}</dd><dt>What happened</dt><dd>${escape(claim.narrative)}</dd></dl></section>
+${promise}
 <form method="post" action="/claim/submit"><input type="hidden" name="pass" value="${escape(pass)}"><input type="hidden" name="claim" value="${escape(claim.id)}">
-<button>Yes, this is my claim</button></form>`));
+<button>Yes, this is my claim</button></form>
+<p class="muted small" style="margin-top:12px">Not yours, or something is wrong? Close this page: nothing is confirmed unless you press the button.</p>`, webBase));
       }
       return c.html(shell(program.title, `<h1>${escape(program.title)}</h1>
-<p>Signed in with PayPal. One claim per PayPal account; any payment goes to this account.</p>${note}
+${account}
+<p class="muted small">Pool ${escape(dollars(program.pool_cents, program.currency))}, shared equally by approved claims. Closes ${escape(new Date(program.closes_at).toUTCString().replace(" GMT", " UTC"))}.</p>
 <form method="post" action="/claim/submit"><input type="hidden" name="pass" value="${escape(pass)}"><input type="hidden" name="program" value="${escape(program.id)}"><input type="hidden" name="device" id="device">
-<label>Email<br><input name="email" type="email" required maxlength="254"></label>
-<label>Mailing address<br><input name="address" required maxlength="300"></label>
-<label>What happened<br><textarea name="narrative" required maxlength="4000" rows="6" placeholder="${escape(program.sample_text)}"></textarea></label>
+<label for="email">Email<span class="hint">Where the program can reach you about this claim.</span></label>
+<input id="email" name="email" type="email" required maxlength="254" autocomplete="email">
+<label for="address">Mailing address<span class="hint">As on your purchase, if you remember it.</span></label>
+<input id="address" name="address" required maxlength="300" autocomplete="street-address">
+<label for="narrative">What happened<span class="hint">In your own words.${program.sample_text ? ` For example: “${escape(program.sample_text)}”` : ""}</span></label>
+<textarea id="narrative" name="narrative" required maxlength="4000" rows="6"></textarea>
+${promise}
 <button>File my claim</button></form>
-<script>${DEVICE_SCRIPT}</script>`));
+<script>${DEVICE_SCRIPT}</script>`, webBase));
     } catch (err) {
-      if (err instanceof ClaimError) return c.html(page("Claim", err.message), 404);
+      if (err instanceof ClaimError) return fail(c, "Claim", sentence(err.message), 404);
       throw err;
     }
   };
+}
+
+function statusUrl(webBase: string, claimId: string): string {
+  return `${webBase}/claim/${encodeURIComponent(claimId)}`;
+}
+
+function sentence(message: string): string {
+  const s = message.charAt(0).toUpperCase() + message.slice(1);
+  return /[.!?]$/.test(s) ? s : `${s}.`;
+}
+
+function dollars(cents: number, currency: string): string {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(cents / 100);
 }
 
 /** A coarse, stable device hash: enough to notice one browser filing many claims, nothing more. */
@@ -287,6 +344,7 @@ export function claimantView(claim: ClaimRow) {
     bound: claim.human_tag !== null,
     amountCents: claim.amount_cents,
     filedAt: claim.filed_at,
+    appealed: claim.appealed_at !== null,
   };
 }
 
@@ -332,21 +390,6 @@ function id(c: Context): string {
 }
 
 function outcome(claim: ClaimRow): string {
-  if (claim.status === "held" && claim.hold_reason === "unverified") return "Your claim is filed, and waits until your PayPal account is verified.";
-  return "Your claim is filed. Claims are reviewed after the program closes; approved claims are paid to your PayPal account.";
-}
-
-function escape(s: string): string {
-  return s.replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
-}
-
-function shell(title: string, body: string): string {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escape(title)}</title><style>body{font:16px/1.5 system-ui,sans-serif;max-width:36rem;margin:3rem auto;padding:0 1rem}
-label{display:block;margin:1rem 0}input,textarea{width:100%;box-sizing:border-box;font:inherit;padding:.5rem}button{font:inherit;padding:.6rem 1.2rem;margin-top:1rem}
-dt{font-weight:600;margin-top:.8rem}dd{margin:0;white-space:pre-wrap}</style></head><body>${body}</body></html>`;
-}
-
-function page(title: string, message: string, claimId?: string): string {
-  return shell(title, `<h1 style="font-size:1.4rem">${escape(title)}</h1><p>${escape(message)}</p>${claimId ? `<p style="color:#555;font-size:.9rem">Claim <code>${escape(claimId)}</code></p>` : ""}`);
+  if (claim.status === "held" && claim.hold_reason === "unverified") return "Your claim is filed. It waits until your PayPal account is verified; nothing else is needed from you.";
+  return "Your claim is filed. Claims are reviewed after the program closes, and approved claims are paid to the PayPal account you signed in with.";
 }

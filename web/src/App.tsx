@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "./components/Link.tsx";
+import { ClaimPage } from "./pages/ClaimPage.tsx";
 import { ConsolePage } from "./pages/ConsolePage.tsx";
 import { HomePage } from "./pages/HomePage.tsx";
 import { LedgerPage } from "./pages/LedgerPage.tsx";
@@ -17,8 +18,11 @@ export function App() {
 
   const ledger = /^\/l\/([\w-]+)\/?$/.exec(path);
   const consoleMatch = /^\/console\/([\w-]+)\/?$/.exec(path);
+  const claimMatch = /^\/claim\/([\w-]+)\/?$/.exec(path);
   const page = ledger ? (
     <LedgerPage id={ledger[1]!} claimId={new URLSearchParams(window.location.search).get("claim")} />
+  ) : claimMatch ? (
+    <ClaimPage key={claimMatch[1]} id={claimMatch[1]!} />
   ) : consoleMatch ? (
     <ConsolePage key={consoleMatch[1]} id={consoleMatch[1]!} />
   ) : (

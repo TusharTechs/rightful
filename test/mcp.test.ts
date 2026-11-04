@@ -67,6 +67,7 @@ test("an assistant can file and follow claims, and has no tool to confirm, decid
   const status = await call("claim_status", { claimId: out.id });
   assert.equal(status.structuredContent.status, "filed");
   assert.equal(status.structuredContent.bound, true);
+  assert.match(String(status.structuredContent.statusUrl), new RegExp(`/claim/${out.id}$`), "a page the person can follow it on");
   assert.doesNotMatch(JSON.stringify(status), /PAYER_PERSON|person0@example/, "no PayPal ID or personal data back to the agent");
 
   const receipt = await call("get_receipt", { claimId: out.id });

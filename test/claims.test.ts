@@ -197,6 +197,13 @@ test("over HTTP: sign in, file; an agent files, its person signs in and confirms
   assert.ok(list.every((c) => !("payee_sealed" in c) && !("bind_code_hash" in c)));
   assert.deepEqual(list.map((c) => c.network).sort(), ["", "203.0.113"]);
 
+  // The same account signing in again sees its claim, not a second form.
+  nextUser = { payer_id: "PAYER_WEB", verified_account: "true" };
+  const again = await signIn(`/claim/start?program=${program.id}`);
+  assert.match(again.html, /You already have a claim here/);
+  assert.doesNotMatch(again.html, /File my claim/);
+  assert.match(again.html, /\/claim\/clm_/, "with a link to follow it");
+
   nextUser = { verified_account: true };
   const noId = await signIn(`/claim/start?program=${program.id}`);
   assert.equal(noId.page.status, 502, "no payer ID, no claim");
@@ -311,5 +318,29 @@ test("agent filings are limited per network and program", async () => {
   for (let i = 0; i < 30; i++) assert.equal((await file(`203.0.113.${i + 1}`)).status, 201);
   assert.equal((await file("203.0.113.200")).status, 429, "the same /24");
   assert.equal((await file("198.51.100.7")).status, 201, "another network is not affected");
+  await deps.db.close();
+});
+
+test("a held claimant can ask for a review once; it changes nothing by itself and reaches the console", async () => {
+  const { deps, program } = await setup();
+  const app = createApp(deps, { adminToken: "admin-token-for-tests" });
+  const { claim } = await fileClaim(deps, program.id, form(), { via: "web", pass: passAfterLogin(deps, program.id, "UNVERIFIED_ONE", false), ip: "10.9.0.1" });
+  const { claim: filed } = await fileClaim(deps, program.id, form(), { via: "web", pass: passAfterLogin(deps, program.id, "VERIFIED_ONE", true), ip: "10.9.1.1" });
+  const appeal = (id: string, message: string) =>
+    app.request(`/api/claims/${id}/appeal`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message }) });
+
+  assert.equal((await appeal(filed.id, "We share a laptop at home, please look again.")).status, 409, "only held claims");
+  assert.equal((await appeal(claim.id, "too short")).status, 400);
+  const ok = await appeal(claim.id, "My account is being verified; my sister also filed from our home.");
+  assert.equal(ok.status, 200);
+  assert.equal(((await ok.json()) as { appealed: boolean }).appealed, true);
+  assert.equal((await appeal(claim.id, "A second request should be refused, politely.")).status, 409, "once per claim");
+  const stored = await getClaim(deps.db, claim.id);
+  assert.equal(stored.status, "held", "an appeal decides nothing");
+  assert.match(stored.appeal_message!, /sister also filed/);
+
+  const status = (await (await app.request(`/api/claims/${claim.id}`)).json()) as { program: { title: string }; appealed: boolean };
+  assert.equal(status.program.title, program.title);
+  assert.equal(status.appealed, true);
   await deps.db.close();
 });

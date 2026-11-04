@@ -24,6 +24,7 @@ export type Runtime = {
   /** The real sandbox client; absent in PAYPAL_MODE=fake. */
   paypal: PayPalClient | undefined;
   publicBase: string;
+  webBase: string;
   production: boolean;
   adminToken: string;
 };
@@ -34,6 +35,8 @@ export async function buildRuntime(env: NodeJS.ProcessEnv = process.env): Promis
   // Render sets RENDER_EXTERNAL_URL to the service's public https address.
   const publicBase = (env.PUBLIC_BASE_URL || env.RENDER_EXTERNAL_URL || `http://localhost:${port}`).replace(/\/$/, "");
   const production = env.NODE_ENV === "production";
+  // The web app (claim status pages, ledgers). On Render it is the rightful-web static site.
+  const webBase = (env.PUBLIC_WEB_URL || (production ? "https://rightful-web.onrender.com" : "http://localhost:5173")).replace(/\/$/, "");
 
   if (production && (!env.HUMAN_TAG_SECRET || !env.ADMIN_TOKEN)) {
     throw new Error("HUMAN_TAG_SECRET and ADMIN_TOKEN are required in production");
@@ -62,11 +65,11 @@ export async function buildRuntime(env: NodeJS.ProcessEnv = process.env): Promis
     ),
     beacon: verifiedBeacon,
   };
-  return { deps, paypal, publicBase, production, adminToken };
+  return { deps, paypal, publicBase, webBase, production, adminToken };
 }
 
 export async function startServer(env: NodeJS.ProcessEnv = process.env, options: { clock?: boolean } = {}): Promise<Server> {
-  const { deps, paypal, publicBase, adminToken } = await buildRuntime(env);
+  const { deps, paypal, publicBase, webBase, adminToken } = await buildRuntime(env);
 
   // Log in with PayPal needs a public https return URL registered on the app (localhost is refused).
   const redirectUri = !paypal
@@ -75,6 +78,7 @@ export async function startServer(env: NodeJS.ProcessEnv = process.env, options:
   const app = createApp(deps, {
     adminToken,
     publicBase,
+    webBase,
     login: redirectUri && paypal
       ? {
           clientId: paypal.clientId,

@@ -29,6 +29,8 @@ export type McpRoutes = {
   programView: (programId: string) => Promise<Record<string, unknown>>;
   clientIp: (c: Context) => string;
   base: (c: Context) => string;
+  /** The web app's origin: the claimant's status page and the public receipt live there. */
+  webBase: string;
 };
 
 export function mountMcp(app: Hono, deps: ClaimsDeps, routes: McpRoutes) {
@@ -126,13 +128,16 @@ function buildServer(deps: ClaimsDeps, routes: McpRoutes, who: { ip: string; bas
     "claim_status",
     {
       title: "Check a claim",
-      description: "Where a claim stands: unbound (waiting for its person), filed, held for review, approved, denied, paid or failed. No personal data.",
+      description:
+        "Where a claim stands: unbound (waiting for its person), filed, held for review, approved, denied, paid or failed. No personal data. Give the person statusUrl: their own page for following the claim and, if it is held, asking a person to look again.",
       inputSchema: { claimId: z.string().min(1).max(64) },
       annotations: { readOnlyHint: true },
     },
     async ({ claimId }) => {
       try {
-        return reply(routes.claimantView(await getClaim(deps.db, claimId)));
+        const claim = await getClaim(deps.db, claimId);
+        // statusUrl is the person's own page for this claim (it shows no personal data either).
+        return reply({ ...routes.claimantView(claim), statusUrl: `${routes.webBase}/claim/${encodeURIComponent(claim.id)}` });
       } catch (err) {
         return refuse(err);
       }
@@ -155,7 +160,7 @@ function buildServer(deps: ClaimsDeps, routes: McpRoutes, who: { ip: string; bas
         return reply({
           ...proof,
           paypalNote: ledger.paypal?.anchor ?? null,
-          receiptUrl: `${(process.env.PUBLIC_WEB_URL ?? "https://rightful-web.onrender.com").replace(/\/$/, "")}/l/${proof.programId}?claim=${encodeURIComponent(claimId)}`,
+          receiptUrl: `${routes.webBase}/l/${proof.programId}?claim=${encodeURIComponent(claimId)}`,
         });
       } catch (err) {
         return refuse(err);

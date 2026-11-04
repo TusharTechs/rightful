@@ -28,7 +28,7 @@ Streamable HTTP, stateless, at `https://rightful-api.onrender.com/mcp`.
 | `list_programs` | Open programs, with pool, closing time and the eligibility statement |
 | `get_program` | One program and its claim counts by status |
 | `file_claim` | Files one claim (`programId`, `email`, `address`, `narrative`, optional `agentName`); returns the `bindUrl` for the person |
-| `claim_status` | Where a claim stands; no personal data and no PayPal identifiers |
+| `claim_status` | Where a claim stands, and `statusUrl`: the person's own page for following it (and asking for a review if it is held); no personal data and no PayPal identifiers |
 | `get_receipt` | For a paid claim: the payout, its Merkle path to the ledger root, the digest on the PayPal payment note, and a receipt link anyone can check |
 
 The `agentName` an assistant gives is shown to the program administrator next to its claims. It
