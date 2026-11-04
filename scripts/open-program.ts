@@ -1,7 +1,9 @@
 /**
  * Opens a claims program on a running API and prints the links to try it:
  *
- *   npm run open:program -- [--pool 2000000] [--hours 24] [--title "…"]
+ *   npm run open:program -- [--pool 2000000] [--hours 24] [--title "…"] [--no-agent]
+ *
+ * --no-agent skips the sample agent-filed claim (for a showcase program people file in themselves).
  *
  * Use a small pool (say --pool 2) to pay for real in the sandbox: its balance cannot cover $2M.
  *
@@ -22,6 +24,7 @@ const { values } = parseArgs({
     pool: { type: "string", default: "2000000" },
     hours: { type: "string", default: "24" },
     title: { type: "string", default: "Filter pitcher settlement (sandbox)" },
+    "no-agent": { type: "boolean", default: false },
   },
 });
 const title = values.title;
@@ -48,20 +51,22 @@ const program = await post<{ id: string; poolCents: number }>(
   },
   true,
 );
-const agent = await post<{ id: string; bindUrl: string }>(`/api/programs/${program.id}/claims`, {
-  email: "sandbox.claimant@example.com",
-  address: "12 Example Street, Fairhaven, OR 97001",
-  narrative: "Filed by an assistant on my behalf: I bought two filter pitchers in 2022.",
-  device: "assistant",
-});
+const agent = values["no-agent"]
+  ? null
+  : await post<{ id: string; bindUrl: string }>(`/api/programs/${program.id}/claims`, {
+      email: "sandbox.claimant@example.com",
+      address: "12 Example Street, Fairhaven, OR 97001",
+      narrative: "Filed by an assistant on my behalf: I bought two filter pitchers in 2022.",
+      device: "assistant",
+    });
 
 console.log(`Program ${program.id} is open for ${hours} h, pool $${(program.poolCents / 100).toFixed(2)}.
 
 File a claim yourself (sign in as a US sandbox personal account):
   ${api}/claim/start?program=${program.id}
 
-Confirm the claim an agent filed (use a different sandbox account, in a private window):
+${agent ? `Confirm the claim an agent filed (use a different sandbox account, in a private window):
   ${agent.bindUrl}
-
+` : ""}
 Admin view:
   curl -H "authorization: Bearer $RIGHTFUL_ADMIN_TOKEN" ${api}/api/programs/${program.id}/claims`);

@@ -61,12 +61,13 @@ export function HomePage() {
 
 function ProgramCard({ program, now }: { program: Program; now: number }) {
   const closesIn = new Date(program.closesAt).getTime() - now;
+  const accepting = program.status === "open" && closesIn > 0;
   const claims = Object.values(program.claims).reduce((sum, n) => sum + n, 0);
   const body = (
     <>
       <div className="card-head">
         <StatusPill status={program.status} />
-        <span className="muted small">{program.status === "open" ? `closes in ${countdown(closesIn)}` : program.shareCents ? `${money(program.shareCents, program.currency)} each` : ""}</span>
+        <span className="muted small">{accepting ? `closes in ${countdown(closesIn)}` : program.status === "open" ? "closed to new claims" : program.shareCents ? `${money(program.shareCents, program.currency)} each` : ""}</span>
       </div>
       <h3>{program.title}</h3>
       <p className="muted">
@@ -78,7 +79,7 @@ function ProgramCard({ program, now }: { program: Program; now: number }) {
     <Link to={`/l/${program.id}`} className="card">
       {body}
     </Link>
-  ) : program.status === "open" ? (
+  ) : accepting ? (
     <a href={claimUrl(program.id)} className="card">
       {body}
     </a>
