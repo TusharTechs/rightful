@@ -116,7 +116,7 @@ export function LedgerPage({ id, claimId }: { id: string; claimId: string | null
 
       <ChecksPanel
         title="Check this ledger yourself"
-        blurb="Your browser recomputes the commitment from every published payout, fetches the drand round from drand itself (not from us), checks its signature, and recomputes the audit sample. If anyone had added a payout, changed an amount, or picked the audited claims by hand, a check fails."
+        blurb="Your browser recomputes the commitment from every published payout, checks that PayPal's records of the payout batches name this ledger, fetches the drand round from drand itself (not from us), checks its signature, and recomputes the audit sample. If anyone had added a payout, changed an amount, or picked the audited claims by hand, a check fails."
         passed="Every payout is in the published ledger, and the audit sample is exactly what the public randomness picked."
         run={(onStep) => verifyPublishedLedger(ledger, onStep)}
       />
