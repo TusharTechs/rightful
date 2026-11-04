@@ -7,6 +7,8 @@ import { money, short } from "../lib.ts";
 
 /** AG Grid loads only when the administrator opens the table. */
 const ClaimsGrid = lazy(() => import("../components/ClaimsGrid.tsx"));
+/** Bryntum Scheduler loads only when the timeline is opened. */
+const RingTimeline = lazy(() => import("../components/RingTimeline.tsx"));
 
 const PATTERN_LABELS: Record<string, string> = {
   "device-farm": "Device farm",
@@ -54,6 +56,7 @@ function Console({ id, token, onForget }: { id: string; token: string; onForget:
   const [open, setOpen] = useState<string | null>(null);
   const [reveal, setReveal] = useState(false);
   const [table, setTable] = useState(false);
+  const [timeline, setTimeline] = useState(false);
 
   const openRing = (ringId: string) => {
     setFilter("all");
@@ -254,6 +257,26 @@ function Console({ id, token, onForget }: { id: string; token: string; onForget:
             />
           ))}
         </div>
+      </section>
+
+      <section className="panel" data-tour="timeline">
+        <div className="panel-head">
+          <div>
+            <h2>The attack on a timeline</h2>
+            <p className="muted small">
+              Every held group as a row, every claim at the moment it was filed. Rows are sorted by the investigator's fraud probability, so its
+              triage reads off the time axis: farms are dense spikes, households a few claims over weeks.
+            </p>
+          </div>
+          <button className="secondary" onClick={() => setTimeline(!timeline)} aria-expanded={timeline}>
+            {timeline ? "Hide the timeline" : "Open the timeline"}
+          </button>
+        </div>
+        {timeline && (
+          <Suspense fallback={<p className="muted small">Loading the timeline…</p>}>
+            <RingTimeline rings={rings} load={() => client.claims()} onOpenRing={openRing} reveal={reveal} />
+          </Suspense>
+        )}
       </section>
 
       <section className="panel" data-tour="table">

@@ -1881,3 +1881,114 @@ details p {
 .claims-grid .row-denied {
   opacity: 0.62;
 }
+
+/* --- the attack on a timeline (Bryntum Scheduler) -------------------------------------------- */
+
+.ring-timeline .rt-host {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.rt-host .b-sch-event-wrap:has(.rt-band) {
+  z-index: 0;
+}
+
+.rt-host .b-sch-event-wrap:has(.rt-claim) {
+  z-index: 1;
+}
+
+.rt-host .b-sch-event.rt-band {
+  --rt: var(--muted);
+  background: color-mix(in srgb, var(--rt) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--rt) 40%, transparent);
+  border-radius: 6px;
+}
+
+.rt-host .b-sch-event.rt-deny {
+  --rt: var(--accent);
+}
+
+.rt-host .b-sch-event.rt-review {
+  --rt: #d97706;
+}
+
+.rt-host .b-sch-event.rt-clear,
+.rt-host .b-sch-event.rt-cleared {
+  --rt: var(--good);
+}
+
+.rt-host .b-sch-event.rt-claim {
+  background: var(--ink);
+  border: 0;
+  border-radius: 2px;
+  min-width: 3px;
+  opacity: 0.8;
+  margin: 3px 0;
+}
+
+.rt-reveal .b-sch-event.rt-claim.truth-ring {
+  background: var(--accent);
+  opacity: 1;
+}
+
+.rt-reveal .b-sch-event.rt-claim.truth-real {
+  background: var(--good);
+  opacity: 1;
+}
+
+.rt-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.rt-chip {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 0 7px;
+  border-radius: 999px;
+  line-height: 18px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+}
+
+.rt-chip.rt-deny {
+  background: var(--bad-bg);
+  color: var(--bad);
+  border-color: transparent;
+}
+
+.rt-chip.rt-review {
+  background: color-mix(in srgb, #d97706 16%, var(--card));
+  color: #9a5800;
+  border-color: transparent;
+}
+
+.rt-chip.rt-clear,
+.rt-chip.rt-cleared {
+  background: var(--good-bg);
+  color: var(--good);
+  border-color: transparent;
+}
+
+.rt-fraud {
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.rt-host .b-grid-cell {
+  cursor: pointer;
+}
+
+.rt-tip {
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.rt-tip span {
+  color: var(--muted);
+}

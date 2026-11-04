@@ -55,6 +55,9 @@
 - **What it changes.** On the $2M demo, each real claimant's share goes from $400 to $631.91 and
   money reaching rings from $600,000 to $48,025; a held claimant can ask a person to look again.
   The fraud it targets is documented in real settlements ([the problem](#the-problem)).
+- **See the attack unfold.** A Bryntum Scheduler timeline puts every held group on one time axis,
+  sorted by the investigator's fraud probability, with each claim at the moment it was filed and a
+  replay of the filings; farms show as bursts, households as a few claims over weeks.
 - **Ready to run and review.** No sign-in needed for the full demo; mobile-first, accessible
   claimant pages; one Render Blueprint; 70 tests with evaluation gates in CI; setup that works on
   Windows, macOS and Linux.
@@ -267,7 +270,7 @@ rightful/
 │   ├── demo/       The hosted $2M demo: seeding, simulated Payouts, pruning
 │   ├── db/         One interface over Postgres and PGlite; the schema
 │   └── dev/        In-memory Payouts for local development and tests
-├── web/            React + Vite app: home, guided tour, console (AG Grid claims table), claim page, ledger, verifier
+├── web/            React + Vite app: home, guided tour, console (Bryntum timeline, AG Grid table), claim page, ledger, verifier
 ├── test/           node:test suites (70 tests), including evaluation gates and contract checks
 ├── scripts/        Open and pay programs, register the webhook, evals, demo, cron tick, migrations
 ├── eval/           Recorded investigator answers (replayed by the demo and CI)
@@ -344,7 +347,7 @@ repo; it prompts for the PayPal client ID and secret (and, optionally, a TypeSaf
 | AI in the product | **TypeSafe** Jev (typed System-1 API) for the ring investigator |
 | Agents | Model Context Protocol (official TypeScript SDK, Streamable HTTP), OpenAPI 3.1 from zod |
 | Backend | TypeScript, Node.js 22, Hono, Postgres, PGlite, zod |
-| Frontend | React, Vite, AG Grid Community (the console's every-claim table) |
+| Frontend | React, Vite, Bryntum Scheduler 8.0 Community (the attack timeline), AG Grid Community (the every-claim table) |
 | Integrity | Merkle trees (`@noble/hashes`), drand quicknet with in-browser BLS verification |
 | Quality | node:test, GitHub Actions, CodeQL |
 

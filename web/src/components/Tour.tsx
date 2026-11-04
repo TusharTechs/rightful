@@ -97,6 +97,18 @@ const STEPS: Step[] = [
     target: "rings",
   },
   {
+    title: "The attack on a timeline",
+    body: (
+      <>
+        Open <strong>the timeline</strong> (Bryntum Scheduler): every held group is a row, sorted by the AI's fraud probability, with each claim at
+        the moment it was filed. Press <strong>Replay</strong> to watch the farms file in bursts; click any row to open its memo.
+      </>
+    ),
+    where: atConsole,
+    go: () => (demoId() ? `/console/${demoId()}` : null),
+    target: "timeline",
+  },
+  {
     title: "You decide, not the AI",
     body: (
       <>

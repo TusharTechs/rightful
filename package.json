@@ -28,6 +28,10 @@
     "demo": "tsx --env-file-if-exists=.env scripts/demo.ts"
   },
   "dependencies": {
+    "@bryntum/core-community": "8.0.0",
+    "@bryntum/engine-community": "8.0.0",
+    "@bryntum/grid-community": "8.0.0",
+    "@bryntum/scheduler-community": "8.0.0",
     "@electric-sql/pglite": "^0.5.11",
     "@hono/node-server": "^2.1.5",
     "@modelcontextprotocol/sdk": "^1.32.2",
