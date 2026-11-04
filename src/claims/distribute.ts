@@ -187,6 +187,22 @@ export type PublicLedger = {
    * demo programs, whose payouts are simulated and so have no PayPal record.
    */
   paypal: { anchor: string; batches: Array<{ batchId: string; timeCreated: string | null; messageAnchored: boolean; items: number; itemsAnchored: number } | { batchId: string; pending: true }> } | null;
+  /**
+   * Where the committed payouts ended up, as PayPal reports them. A payout PayPal could not deliver
+   * (failed, returned, blocked...) is not sent anywhere else: its money stays with the program's
+   * PayPal account, and it is listed here so the ledger still adds up.
+   */
+  delivery: {
+    delivered: number;
+    /** Sent, not settled yet (pending, or unclaimed: PayPal returns unclaimed payouts after 30 days). */
+    waiting: Array<{ claimId: string; status: string }>;
+    notDelivered: Array<{ claimId: string; status: string }>;
+    notDeliveredCents: number;
+    /** Rounding leftover: the pool minus every committed payout. */
+    remainderCents: number;
+    /** Signature-verified PayPal webhook deliveries about these payouts (live programs only). */
+    notifications: { count: number; lastAt: string | null; types: Record<string, number> } | null;
+  };
 };
 
 /** Everything anyone needs to check the distribution. No payer IDs, no personal data. */
@@ -195,6 +211,7 @@ export async function publicLedger(deps: ClaimsDeps, programId: string): Promise
   if (!program.commitment_digest) throw new ClaimError("this program has not distributed yet", "wrong_state");
   const payouts = await ledgerPayouts(deps.db, program.id);
   return {
+    delivery: await deliveryOf(deps, program, payouts),
     terms: termsOf(program),
     commitment: { root: program.commitment_root!, payoutCount: payouts.length, digest: program.commitment_digest },
     payouts,
@@ -211,6 +228,32 @@ export async function publicLedger(deps: ClaimsDeps, programId: string): Promise
               .filter((b) => b.batchId)
               .map((b) => (b.paypal ? { batchId: b.batchId!, ...b.paypal } : { batchId: b.batchId!, pending: true as const })),
           },
+  };
+}
+
+async function deliveryOf(deps: ClaimsDeps, program: ProgramRow, payouts: PayoutLeaf[]): Promise<PublicLedger["delivery"]> {
+  const rows = await deps.db.query<{ id: string; status: string; payout_status: string | null; amount_cents: number }>(
+    `select id, status, payout_status, amount_cents from claims where program_id = $1 and amount_cents is not null order by id`,
+    [program.id],
+  );
+  const notDelivered = rows.filter((r) => r.status === "failed");
+  const committed = payouts.reduce((sum, p) => sum + p.amountCents, 0);
+  let notifications: PublicLedger["delivery"]["notifications"] = null;
+  if (program.kind !== "demo") {
+    const events = await deps.db.query<{ event_type: string; n: number; last: Date }>(
+      `select event_type, count(*)::int as n, max(received_at) as last from paypal_events where program_id = $1 group by event_type order by event_type`,
+      [program.id],
+    );
+    const last = events.reduce<number>((acc, e) => Math.max(acc, new Date(e.last).getTime()), 0);
+    notifications = { count: events.reduce((n, e) => n + e.n, 0), lastAt: last ? new Date(last).toISOString() : null, types: Object.fromEntries(events.map((e) => [e.event_type, e.n])) };
+  }
+  return {
+    delivered: rows.filter((r) => r.status === "paid").length,
+    waiting: rows.filter((r) => r.status === "approved").map((r) => ({ claimId: r.id, status: r.payout_status ?? "NOT SENT" })),
+    notDelivered: notDelivered.map((r) => ({ claimId: r.id, status: r.payout_status ?? "FAILED" })),
+    notDeliveredCents: notDelivered.reduce((sum, r) => sum + r.amount_cents, 0),
+    remainderCents: program.pool_cents - committed,
+    notifications,
   };
 }
 

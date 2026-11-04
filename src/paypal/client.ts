@@ -29,6 +29,8 @@ export type RequestOptions = {
   headers?: Record<string, string>;
   /** Use this bearer token instead of the app's (for Log in with PayPal user tokens). */
   bearer?: string;
+  /** A JSON body sent exactly as given (instead of `body`), for payloads that must not be re-serialized. */
+  rawBody?: string;
 };
 
 type ErrorBody = {
@@ -116,7 +118,7 @@ export class PayPalClient {
         Accept: "application/json",
         ...options.headers,
       };
-      if (options.body !== undefined) headers["Content-Type"] = "application/json";
+      if (options.body !== undefined || options.rawBody !== undefined) headers["Content-Type"] = "application/json";
       if (options.idempotencyKey) headers["PayPal-Request-Id"] = options.idempotencyKey;
 
       let response: Response;
@@ -124,7 +126,7 @@ export class PayPalClient {
         response = await this.fetchImpl(url, {
           method,
           headers,
-          body: options.body === undefined ? undefined : JSON.stringify(options.body),
+          body: options.rawBody ?? (options.body === undefined ? undefined : JSON.stringify(options.body)),
           signal: AbortSignal.timeout(this.timeoutMs),
         });
       } catch (err) {

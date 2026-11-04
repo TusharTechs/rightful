@@ -12,6 +12,7 @@ import { cors } from "hono/cors";
 import { type ClaimsDeps, ClaimError, getProgram } from "../claims/service.ts";
 import { isDemoToken } from "../demo/seed.ts";
 import { PayPalError } from "../paypal/client.ts";
+import { type WebhookVerifier, receivePayPalWebhook } from "../claims/webhooks.ts";
 import { claimantAfterLogin, mountClaims } from "./claims.ts";
 import { type LoginConfig, mountLogin } from "./login.ts";
 
@@ -22,6 +23,8 @@ export type AppOptions = {
   publicBase?: string;
   /** The web app's origin, for claim status links on the claimant pages. */
   webBase?: string;
+  /** Checks PayPal webhook signatures; without one, `/webhooks/paypal` answers 404. */
+  webhooks?: WebhookVerifier;
 };
 
 export function createApp(deps: ClaimsDeps, options: AppOptions) {
@@ -68,6 +71,13 @@ export function createApp(deps: ClaimsDeps, options: AppOptions) {
   };
 
   app.get("/health", (c) => c.json({ ok: true }));
+
+  // PayPal's Payouts notifications: signature checked with PayPal, recorded once, then a read-back.
+  app.post("/webhooks/paypal", async (c) => {
+    if (!options.webhooks) return c.json({ error: "not_configured" }, 404);
+    const result = await receivePayPalWebhook(deps, options.webhooks, (name) => c.req.header(name), await c.req.text());
+    return c.json(result, result.status);
+  });
 
   mountClaims(app, deps, { admin, programAdmin, publicBase: options.publicBase, webBase });
 

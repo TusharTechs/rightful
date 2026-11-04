@@ -14,6 +14,7 @@
     "typecheck": "tsc --noEmit",
     "test": "tsx --test \"test/**/*.test.ts\"",
     "probe": "tsx --env-file-if-exists=.env scripts/probe.ts",
+    "webhook:register": "tsx --env-file-if-exists=.env scripts/register-webhook.ts",
     "dev:api": "tsx --env-file-if-exists=.env src/api/main.ts",
     "clock": "tsx scripts/clock.ts",
     "dev:web": "vite",

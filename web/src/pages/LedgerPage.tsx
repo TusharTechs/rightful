@@ -100,6 +100,8 @@ export function LedgerPage({ id, claimId }: { id: string; claimId: string | null
         </section>
       )}
 
+      {ledger.delivery && <DeliveryPanel ledger={ledger} />}
+
       {ledger.paypal && <HistoryPanel ledger={ledger} />}
 
       <section className="panel">
@@ -123,6 +125,54 @@ export function LedgerPage({ id, claimId }: { id: string; claimId: string | null
         run={(onStep) => verifyPublishedLedger(ledger, onStep)}
       />
     </article>
+  );
+}
+
+/** Where every committed payout ended up, as PayPal reported it, so the ledger always adds up. */
+function DeliveryPanel({ ledger }: { ledger: PublicLedger }) {
+  const d = ledger.delivery;
+  const cur = ledger.terms.currency;
+  const n = d.notifications;
+  return (
+    <section className="panel">
+      <h2>Where the money went</h2>
+      <p>
+        <strong>{d.delivered}</strong> of {ledger.payouts.length} payouts delivered
+        {d.waiting.length > 0 && <>, {d.waiting.length} still with PayPal</>}
+        {d.notDelivered.length > 0 && (
+          <>
+            , <strong>{d.notDelivered.length} not delivered</strong> ({money(d.notDeliveredCents, cur)})
+          </>
+        )}
+        .
+      </p>
+      {d.notDelivered.length > 0 && (
+        <>
+          <p className="muted small">
+            PayPal could not deliver these. Their money went back to the program's PayPal account and was not sent anywhere else; the payouts stay in
+            the ledger exactly as committed.
+          </p>
+          <ul className="small">
+            {d.notDelivered.slice(0, 10).map((p) => (
+              <li key={p.claimId}>
+                <code>{short(p.claimId, 10)}</code>: {p.status.toLowerCase()}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {d.waiting.some((w) => w.status === "UNCLAIMED") && (
+        <p className="muted small">Unclaimed payouts wait for their account; PayPal returns them to the program after 30 days.</p>
+      )}
+      <p className="muted small">
+        {d.remainderCents > 0 ? `${money(d.remainderCents, cur)} left over from rounding stays in the pool. ` : ""}
+        {n
+          ? n.count > 0
+            ? `PayPal notified us ${n.count} time${n.count === 1 ? "" : "s"} about these payouts (each signature checked with PayPal; last ${new Date(n.lastAt!).toLocaleString()}). Every notification only makes the API read the batch back from PayPal, which stays the source of truth.`
+            : "Every payout's state is read back from PayPal's Payouts API; PayPal's notifications only make that happen sooner."
+          : ""}
+      </p>
+    </section>
   );
 }
 

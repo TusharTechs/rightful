@@ -69,6 +69,19 @@ alter table claims add column if not exists agent_name text;
 alter table claims add column if not exists payout_transaction_id text;
 -- The last reconciliation of a live program's payouts against PayPal's transaction history.
 alter table programs add column if not exists reconciliation jsonb;
+-- PayPal webhook deliveries whose signature PayPal confirmed, once each by event ID. Each one only
+-- triggers a read-back of the batch; claims' money state still comes from that read-back.
+create table if not exists paypal_events (
+  id               text primary key,
+  event_type       text not null,
+  resource_id      text,
+  program_id       text,
+  claim_id         text,
+  reported_status  text,
+  outcome          text,
+  received_at      timestamptz not null default now()
+);
+create index if not exists paypal_events_program on paypal_events (program_id);
 -- A held claimant's request for a person to look again (once per claim), shown in the console.
 alter table claims add column if not exists appeal_message text;
 alter table claims add column if not exists appealed_at timestamptz;

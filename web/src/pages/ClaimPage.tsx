@@ -109,7 +109,7 @@ function stepsFor(claim: ClaimStatus): Step[] {
         claim.status === "paid"
           ? `${money(claim.amountCents ?? 0)}, by PayPal Payouts, to the account you signed in with.`
           : claim.status === "failed"
-            ? "PayPal returned the payment. The program administrator will be in touch."
+            ? "PayPal could not deliver it to your account. The money went back to the program, never to anyone else; the program administrator will be in touch."
             : claim.status === "approved"
               ? "Sent; PayPal is delivering it."
               : "An equal share of the pool, once every claim is reviewed.",

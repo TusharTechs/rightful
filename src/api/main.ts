@@ -7,6 +7,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { serve } from "@hono/node-server";
 import { tickClaims } from "../claims/distribute.ts";
 import { payoutsPort } from "../claims/payouts-port.ts";
+import { paypalWebhookVerifier } from "../claims/webhooks.ts";
 import type { ClaimsDeps } from "../claims/service.ts";
 import { openFromEnv } from "../db/db.ts";
 import { FakePayouts } from "../dev/fake-payouts.ts";
@@ -79,6 +80,10 @@ export async function startServer(env: NodeJS.ProcessEnv = process.env, options:
     adminToken,
     publicBase,
     webBase,
+    // PayPal notifies https URLs only; the webhook is found by its URL unless PAYPAL_WEBHOOK_ID is set.
+    webhooks: paypal && publicBase.startsWith("https://")
+      ? paypalWebhookVerifier(paypal, env.PAYPAL_WEBHOOK_ID ? { id: env.PAYPAL_WEBHOOK_ID } : { url: `${publicBase}/webhooks/paypal` })
+      : undefined,
     login: redirectUri && paypal
       ? {
           clientId: paypal.clientId,

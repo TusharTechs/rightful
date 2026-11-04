@@ -38,7 +38,7 @@ records the reasons. Pieces marked *(planned)* are not built yet.
 5. **Read back and audit.** The clock polls every payout item to `paid` or `failed`, and once the
    committed round is out, draws the audit sample from its randomness.
 
-## Planned
+## Also on the API
 
-- `rightful-api` MCP endpoint for agents *(planned)*: the same filing path as the JSON API.
-- Payouts item webhooks *(planned)*, as a second signal next to polling.
+- The claimant MCP server at `/mcp` (`src/api/mcp.ts`): the same filing path and limit as the JSON API; see `docs/agents.md`.
+- Payouts webhooks at `POST /webhooks/paypal` (`src/claims/webhooks.ts`): each delivery's signature is checked with PayPal, it is recorded once by event ID, and it only makes the API read that batch back at once. Polling stays the source of truth. Register with `npm run webhook:register`; the API finds its webhook by URL.
