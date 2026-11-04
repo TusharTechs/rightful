@@ -74,8 +74,8 @@ const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
 const count = (kind: Kind, rec: Memo["recommendation"]) => rows.filter((r) => r.kind === kind && r.memo.recommendation === rec).length;
 const total = (kind: Kind) => rows.filter((r) => r.kind === kind).length;
 const mean = (pick: (s: (typeof scores)[number]) => number) => scores.reduce((sum, s) => sum + pick(s), 0) / scores.length;
-const patternRight = (r: Row) => (r.kind === "ring" ? r.memo.verdict.pattern === r.truthKind : BENIGN.has(r.memo.verdict.pattern));
-const models = [...new Set(rows.map((r) => r.memo.verdict.model))].join(", ");
+const patternRight = (r: Row) => (!r.memo.verdict ? false : r.kind === "ring" ? r.memo.verdict.pattern === r.truthKind : BENIGN.has(r.memo.verdict.pattern));
+const models = [...new Set(rows.map((r) => r.memo.verdict?.model ?? "rejected"))].join(", ");
 
 const lines = [
   `## Investigator eval`,

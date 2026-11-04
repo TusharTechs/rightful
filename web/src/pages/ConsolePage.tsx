@@ -322,10 +322,10 @@ function RingRow(props: {
       <button className="ring-summary" onClick={props.onToggle} aria-expanded={open}>
         <span className="ring-size">{ring.size}</span>
         <span className="ring-main">
-          <strong>{memo ? PATTERN_LABELS[memo.verdict.pattern] ?? memo.verdict.pattern : "No memo"}</strong>
+          <strong>{!memo ? "No memo" : !memo.verdict ? "Model output rejected" : PATTERN_LABELS[memo.verdict.pattern] ?? memo.verdict.pattern}</strong>
           <span className="muted small">{memo?.evidence[0] ?? signals.map(([s, n]) => `${s} ×${n}`).join(" · ")}</span>
         </span>
-        {memo && (
+        {memo?.verdict && (
           <span className="ring-odds" title="The model's probability that this group is a fraud operation">
             <span className="odds-bar">
               <span style={{ width: `${memo.verdict.coordinated * 100}%` }} />
@@ -368,11 +368,18 @@ function RingDetail({ ring, reveal, disabled, onDecide, loadMembers }: Parameter
                 <li key={line}>{line}</li>
               ))}
             </ul>
-            <p className="muted small">
-              Model answers ({memo.verdict.model}): fraud operation {Math.round(memo.verdict.coordinated * 100)}%; best fit “
-              {PATTERN_LABELS[memo.verdict.pattern]}” ({Math.round(memo.verdict.patternConfidence * 100)}%); evidence strength{" "}
-              {memo.verdict.strength.toFixed(1)} of 4. The facts above are computed from the claims, not written by the model.
-            </p>
+            {memo.verdict ? (
+              <p className="muted small">
+                Model answers ({memo.verdict.model}): fraud operation {Math.round(memo.verdict.coordinated * 100)}%; best fit “
+                {PATTERN_LABELS[memo.verdict.pattern]}” ({Math.round(memo.verdict.patternConfidence * 100)}%); evidence strength{" "}
+                {memo.verdict.strength.toFixed(1)} of 4. The facts above are computed from the claims, not written by the model.
+              </p>
+            ) : (
+              <p className="notice small">
+                <strong>Model output rejected:</strong> {memo.rejected}. Its answer was not used; the facts above are computed from the claims.
+                Decide on the evidence.
+              </p>
+            )}
           </>
         ) : (
           <p className="muted">No memo for this group: decide on the evidence below.</p>

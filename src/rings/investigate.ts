@@ -76,7 +76,10 @@ export type Memo = {
   ringId: string;
   claims: number;
   recommendation: Recommendation;
-  verdict: Verdict;
+  /** The model's checked answers, or null when they failed the check (see `rejected`). */
+  verdict: Verdict | null;
+  /** Why the model's output was refused. The ring then goes to a person as "review". */
+  rejected?: string;
   /** Facts computed from the claims, never from the model. */
   evidence: string[];
 };
@@ -157,10 +160,65 @@ export function recommend(verdict: Verdict, file: CaseFile): Recommendation {
   return "review";
 }
 
-export async function investigateRing(investigator: Investigator, ring: Ring, claims: ReadonlyMap<string, ClaimSignals>, sampleText = ""): Promise<Memo> {
+/** How long one ring's questions may take before the ring is left for the next run. */
+export const INVESTIGATE_TIMEOUT_MS = 30_000;
+
+export class VerdictRejected extends Error {
+  constructor(reason: string) {
+    super(reason);
+    this.name = "VerdictRejected";
+  }
+}
+
+/**
+ * The model's answers are data from outside, so they are checked like any input: every number in
+ * range, the pattern one of the fixed choices. Anything else is refused, never repaired or guessed.
+ */
+export function checkVerdict(value: unknown): Verdict {
+  if (typeof value !== "object" || value === null) throw new VerdictRejected("the answer is not an object");
+  const v = value as Record<string, unknown>;
+  const inRange = (key: string, lo: number, hi: number) => {
+    const x = v[key];
+    if (typeof x !== "number" || !Number.isFinite(x) || x < lo || x > hi) throw new VerdictRejected(`${key} must be a number from ${lo} to ${hi}, got ${JSON.stringify(x)}`);
+    return x;
+  };
+  const coordinated = inRange("coordinated", 0, 1);
+  const patternConfidence = inRange("patternConfidence", 0, 1);
+  const strength = inRange("strength", 0, 4);
+  if (typeof v.pattern !== "string" || !Object.hasOwn(PATTERNS, v.pattern)) throw new VerdictRejected(`pattern ${JSON.stringify(v.pattern)} is not one of the choices`);
+  const model = typeof v.model === "string" && v.model ? v.model : "unknown";
+  return { coordinated, pattern: v.pattern as Pattern, patternConfidence, strength, model };
+}
+
+/**
+ * One ring's memo. A call that fails or times out throws, and the ring is retried on the next run;
+ * an answer that fails the check becomes a "review" memo saying why. Either way a person decides.
+ */
+export async function investigateRing(
+  investigator: Investigator,
+  ring: Ring,
+  claims: ReadonlyMap<string, ClaimSignals>,
+  sampleText = "",
+  options: { timeoutMs?: number } = {},
+): Promise<Memo> {
   const file = caseFileFor(ring, claims, sampleText);
-  const verdict = await investigator.investigate(file);
-  return { ringId: ring.id, claims: ring.claimIds.length, recommendation: recommend(verdict, file), verdict, evidence: evidenceOf(file) };
+  const evidence = evidenceOf(file);
+  const answer = await withTimeout(investigator.investigate(file), options.timeoutMs ?? INVESTIGATE_TIMEOUT_MS);
+  try {
+    const verdict = checkVerdict(answer);
+    return { ringId: ring.id, claims: ring.claimIds.length, recommendation: recommend(verdict, file), verdict, evidence };
+  } catch (err) {
+    if (!(err instanceof VerdictRejected)) throw err;
+    return { ringId: ring.id, claims: ring.claimIds.length, recommendation: "review", verdict: null, rejected: err.message, evidence };
+  }
+}
+
+function withTimeout<T>(work: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`the investigator did not answer within ${ms} ms`)), ms);
+  });
+  return Promise.race([work, timeout]).finally(() => clearTimeout(timer));
 }
 
 /** Bump when the questions change, so recorded answers are not replayed against new questions. */

@@ -21,7 +21,7 @@ export type ConsoleRing = {
   verifiedShare: number;
   firstFiledAt: string;
   lastFiledAt: string;
-  memo: Pick<Memo, "recommendation" | "verdict" | "evidence"> | null;
+  memo: Pick<Memo, "recommendation" | "verdict" | "evidence" | "rejected"> | null;
   decision: "deny" | "approve" | null;
   /** Demo programs only: how many members are really ring claims, and of which kind. */
   truth?: { ringClaims: number; genuineClaims: number; kind: string };
@@ -116,7 +116,7 @@ export async function consoleView(deps: ClaimsDeps, programId: string): Promise<
         verifiedShare: row.evidence.verifiedShare,
         firstFiledAt: new Date(row.evidence.firstFiledAt).toISOString(),
         lastFiledAt: new Date(row.evidence.lastFiledAt).toISOString(),
-        memo: row.memo ? { recommendation: row.memo.recommendation, verdict: row.memo.verdict, evidence: row.memo.evidence } : null,
+        memo: row.memo ? { recommendation: row.memo.recommendation, verdict: row.memo.verdict, evidence: row.memo.evidence, rejected: row.memo.rejected } : null,
         decision: row.decision,
         ...(isDemo && truth ? { truth: { ringClaims: truth.ring, genuineClaims: truth.genuine, kind: top.split(":")[1] ?? top } } : {}),
       };

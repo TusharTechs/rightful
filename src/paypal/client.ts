@@ -17,6 +17,8 @@ export type PayPalConfig = {
   /** Waits between retries. Tests pass a no-op. */
   sleep?: (ms: number) => Promise<void>;
   maxRetries?: number;
+  /** Per-attempt limit; a request that hangs is aborted and, if it is safe to, retried. */
+  timeoutMs?: number;
 };
 
 export type RequestOptions = {
@@ -69,11 +71,13 @@ export class PayPalClient {
   private readonly fetchImpl: typeof fetch;
   private readonly sleep: (ms: number) => Promise<void>;
   private readonly maxRetries: number;
+  private readonly timeoutMs: number;
 
   constructor(private readonly config: PayPalConfig) {
     this.fetchImpl = config.fetch ?? fetch;
     this.sleep = config.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
     this.maxRetries = config.maxRetries ?? 3;
+    this.timeoutMs = config.timeoutMs ?? 20_000;
   }
 
   /** Builds a client from `PAYPAL_*` variables. Refuses anything but the sandbox. */
@@ -121,6 +125,7 @@ export class PayPalClient {
           method,
           headers,
           body: options.body === undefined ? undefined : JSON.stringify(options.body),
+          signal: AbortSignal.timeout(this.timeoutMs),
         });
       } catch (err) {
         if (!retryable || attempt >= this.maxRetries) throw err;
@@ -182,6 +187,7 @@ export class PayPalClient {
         Accept: "application/json",
       },
       body: form.toString(),
+      signal: AbortSignal.timeout(this.timeoutMs),
     });
     const text = await response.text();
     const body = parseJson(text);

@@ -120,3 +120,31 @@ test("only the sandbox is allowed", () => {
   assert.throws(() => PayPalClient.fromEnv({ PAYPAL_ENV: "live", PAYPAL_CLIENT_ID: "a", PAYPAL_CLIENT_SECRET: "b" }), /sandbox/);
   assert.throws(() => PayPalClient.fromEnv({ PAYPAL_ENV: "sandbox" }), /PAYPAL_CLIENT_ID/);
 });
+
+test("a request that hangs is aborted per attempt and retried when it is safe to", async (t) => {
+  // AbortSignal.timeout does not keep the process alive (a server does); hold it open for the test.
+  const alive = setInterval(() => {}, 1000);
+  t.after(() => clearInterval(alive));
+  let calls = 0;
+  const hangsOnce = (async (input: URL | RequestInfo, init?: RequestInit) => {
+    if (String(input).endsWith("/v1/oauth2/token")) return json(200, { access_token: "t", expires_in: 32400 });
+    calls++;
+    if (calls === 1) {
+      return new Promise<Response>((_, reject) => init?.signal?.addEventListener("abort", () => reject(init.signal!.reason)));
+    }
+    return json(200, { ok: true });
+  }) as typeof fetch;
+  const paypal = new PayPalClient({ clientId: "id", clientSecret: "secret", fetch: hangsOnce, sleep: async () => {}, timeoutMs: 20 });
+  assert.deepEqual(await paypal.request("GET", "/v1/payments/payouts/B1"), { ok: true });
+  assert.equal(calls, 2);
+
+  calls = 0;
+  const neverAnswers = (async (input: URL | RequestInfo, init?: RequestInit) => {
+    if (String(input).endsWith("/v1/oauth2/token")) return json(200, { access_token: "t", expires_in: 32400 });
+    calls++;
+    return new Promise<Response>((_, reject) => init?.signal?.addEventListener("abort", () => reject(init.signal!.reason)));
+  }) as typeof fetch;
+  const strict = new PayPalClient({ clientId: "id", clientSecret: "secret", fetch: neverAnswers, sleep: async () => {}, timeoutMs: 20 });
+  await assert.rejects(strict.request("POST", "/v1/payments/payouts", { body: {} }));
+  assert.equal(calls, 1, "a money call without an idempotency key is never retried");
+});

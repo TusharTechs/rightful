@@ -39,9 +39,9 @@ if (program.status === "open" || program.status === "review") {
   );
   console.log(`Review: ${review.approved} approved, held ${JSON.stringify(review.held)}, ${review.unbound} never confirmed by a person`);
   if (review.rings.length) {
-    const rings = await call<{ id: string; claimIds: string[]; memo: { recommendation: string; evidence: string[]; verdict: { coordinated: number; pattern: string } } | null }[]>("GET", `/api/programs/${programId}/rings`);
+    const rings = await call<{ id: string; claimIds: string[]; memo: { recommendation: string; evidence: string[]; verdict: { coordinated: number; pattern: string } | null; rejected?: string } | null }[]>("GET", `/api/programs/${programId}/rings`);
     for (const ring of rings) {
-      const memo = ring.memo ? `investigator: ${ring.memo.recommendation} (${ring.memo.verdict.pattern}, ${Math.round(ring.memo.verdict.coordinated * 100)}% coordinated)` : "no memo";
+      const memo = !ring.memo ? "no memo" : !ring.memo.verdict ? `investigator: review (model output rejected: ${ring.memo.rejected})` : `investigator: ${ring.memo.recommendation} (${ring.memo.verdict.pattern}, ${Math.round(ring.memo.verdict.coordinated * 100)}% coordinated)`;
       console.log(`  ${ring.id}: ${ring.claimIds.length} claims; ${memo}${ring.memo ? `\n    - ${ring.memo.evidence.join("\n    - ")}` : ""}`);
     }
   }

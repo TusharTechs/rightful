@@ -92,3 +92,35 @@ test("answers are recorded once and replayed without the live service", async ()
   assert.deepEqual(again, first);
   await assert.rejects(investigateRing(replay, rings[5]!, byId, program.sampleText), /no recorded answer/);
 });
+
+test("the model's answers are checked like any input, and a bad answer becomes a review memo", async () => {
+  const { program, byId, rings } = sample();
+  const ring = rings[0]!;
+  const answering = (answer: unknown): Investigator => ({ investigate: async () => answer as Verdict });
+  const bad: Array<[string, unknown]> = [
+    ["out of range", verdict({ coordinated: 1.7 })],
+    ["negative", verdict({ strength: -1 })],
+    ["NaN", verdict({ patternConfidence: Number.NaN })],
+    ["string number", { ...verdict(), coordinated: "0.9" }],
+    ["unknown pattern", { ...verdict(), pattern: "definitely-fine" }],
+    ["inherited key as pattern", { ...verdict(), pattern: "toString" }],
+    ["not an object", "recommend clear"],
+    ["null", null],
+  ];
+  for (const [name, answer] of bad) {
+    const memo = await investigateRing(answering(answer), ring, byId, program.sampleText);
+    assert.equal(memo.recommendation, "review", name);
+    assert.equal(memo.verdict, null, name);
+    assert.ok(memo.rejected, name);
+    assert.ok(memo.evidence.length > 0, `${name}: the facts computed in code are still there`);
+  }
+  const good = await investigateRing(answering(verdict()), ring, byId, program.sampleText);
+  assert.equal(good.rejected, undefined);
+  assert.ok(good.verdict);
+});
+
+test("an investigator that hangs is cut off, and the ring is left for the next run", async () => {
+  const { program, byId, rings } = sample();
+  const hanging: Investigator = { investigate: () => new Promise(() => {}) };
+  await assert.rejects(investigateRing(hanging, rings[0]!, byId, program.sampleText, { timeoutMs: 20 }), /did not answer/);
+});
