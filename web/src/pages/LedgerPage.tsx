@@ -65,7 +65,7 @@ export function LedgerPage({ id, claimId }: { id: string; claimId: string | null
       </section>
 
       {claimId && (
-        <section className={`panel proofbox ${inLedger ? "ok" : inLedger === false ? "bad" : ""}`}>
+        <section className={`panel proofbox ${inLedger ? "ok" : inLedger === false ? "bad" : ""}`} data-tour="receipt">
           {receiptError && !receipt ? (
             <h2>This claim has no payout in this ledger</h2>
           ) : inLedger === null ? (
@@ -86,6 +86,43 @@ export function LedgerPage({ id, claimId }: { id: string; claimId: string | null
                   </>
                 )}
               </p>
+              {inLedger && (
+                <ol className="proof-chain" aria-label="The chain of proof">
+                  <li>
+                    <span className="pc-dot">1</span>
+                    <span>
+                      <strong>Your payout</strong> {money(receipt!.payout.amountCents, ledger.terms.currency)} to pseudonym{" "}
+                      <code>{short(receipt!.payout.humanTag, 8)}</code>
+                    </span>
+                  </li>
+                  <li>
+                    <span className="pc-dot">2</span>
+                    <span>
+                      <strong>{receipt!.proof.path.length} hashes</strong> up the Merkle path, recomputed in your browser
+                    </span>
+                  </li>
+                  <li>
+                    <span className="pc-dot">3</span>
+                    <span>
+                      <strong>The ledger root</strong> <code>{short(ledger.commitment.root, 10)}</code>, committed before any money moved
+                    </span>
+                  </li>
+                  {ledger.paypal && (
+                    <li>
+                      <span className="pc-dot">4</span>
+                      <span>
+                        <strong>PayPal's own record</strong>: the batch and your payment's note carry the ledger's digest
+                      </span>
+                    </li>
+                  )}
+                  <li>
+                    <span className="pc-dot">{ledger.paypal ? 5 : 4}</span>
+                    <span>
+                      <strong>drand round {ledger.terms.auditRound}</strong>, fixed in the ledger, {ledger.audit ? "picked the audit sample" : "will pick the audit sample"}
+                    </span>
+                  </li>
+                </ol>
+              )}
               <details>
                 <summary>See the proof</summary>
                 <p>
@@ -123,6 +160,7 @@ export function LedgerPage({ id, claimId }: { id: string; claimId: string | null
         blurb="Your browser recomputes the commitment from every published payout, checks that PayPal's records of the payout batches name this ledger, fetches the drand round from drand itself (not from us), checks its signature, and recomputes the audit sample. If anyone had added a payout, changed an amount, or picked the audited claims by hand, a check fails."
         passed="Every payout is in the published ledger, and the audit sample is exactly what the public randomness picked."
         run={(onStep) => verifyPublishedLedger(ledger, onStep)}
+        tour="verify"
       />
     </article>
   );

@@ -1090,3 +1090,510 @@ details p {
   white-space: nowrap;
   border: 0;
 }
+
+/* --- the guided tour ------------------------------------------------------------------------- */
+
+.topbar-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.tour-start {
+  border: 1.5px solid var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+  border-radius: 999px;
+  padding: 7px 14px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.tour-invite {
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.tour-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.tour {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 50;
+  width: min(380px, calc(100vw - 32px));
+  background: var(--card);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 16px 18px 14px;
+  box-shadow: 0 18px 50px rgb(0 0 0 / 0.18), 0 2px 6px rgb(0 0 0 / 0.08);
+  animation: tour-in 280ms ease-out;
+}
+
+@keyframes tour-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+}
+
+.tour-head {
+  display: grid;
+  grid-template-columns: 40px 1fr auto;
+  gap: 12px;
+  align-items: start;
+}
+
+.tour-head h2 {
+  margin: 2px 0 0;
+  font-size: 1.15rem;
+}
+
+.tour-avatar {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: #121212;
+  color: var(--accent);
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 1.2rem;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent);
+  animation: tour-breathe 2.4s ease-in-out infinite;
+}
+
+@keyframes tour-breathe {
+  50% {
+    box-shadow: 0 0 0 7px color-mix(in srgb, var(--accent) 10%, transparent);
+  }
+}
+
+.tour-kicker {
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+
+.tour-x {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.4rem;
+  line-height: 1;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+
+.tour-body {
+  margin: 10px 0 12px;
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
+.tour-body code {
+  font-size: 0.78em;
+}
+
+.tour-body a {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.tour-progress {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.tour-progress span {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line);
+}
+
+.tour-progress .done {
+  background: var(--ink);
+}
+
+.tour-progress .now {
+  background: var(--accent);
+}
+
+.tour-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tour-actions .tour-link {
+  color: var(--muted);
+  font-weight: 500;
+  font-size: 0.85rem;
+}
+
+.tour-spacer {
+  flex: 1;
+}
+
+.tour-primary {
+  background: var(--accent);
+  color: #fff;
+  border: 0;
+  border-radius: 999px;
+  padding: 9px 18px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.tour-wait {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.tour-fab {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 50;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 6px 14px 6px 6px;
+  font-weight: 700;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.15);
+  cursor: pointer;
+}
+
+.tour-fab .mark {
+  background: #121212;
+}
+
+.tour-target {
+  position: relative;
+  z-index: 2;
+  outline: 3px solid var(--accent);
+  outline-offset: 6px;
+  border-radius: var(--radius);
+  animation: tour-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes tour-pulse {
+  50% {
+    outline-color: color-mix(in srgb, var(--accent) 35%, transparent);
+    outline-offset: 10px;
+  }
+}
+
+@media (max-width: 640px) {
+  .tour,
+  .tour-fab {
+    right: 12px;
+    left: 12px;
+    bottom: 12px;
+    width: auto;
+  }
+  .tour-start {
+    padding: 6px 12px;
+  }
+}
+
+/* --- the pool on the home page --------------------------------------------------------------- */
+
+.pool {
+  margin: 26px 0 24px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 16px;
+}
+
+.pool-switch {
+  display: inline-flex;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  margin-bottom: 14px;
+}
+
+.pool-switch button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 7px 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pool-switch button.on {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.pool-body {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+
+.pool-numbers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 20px;
+}
+
+.pool-numbers p {
+  grid-column: 1 / -1;
+}
+
+.pool-dots {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.pool-dots .dot {
+  transition: fill 500ms ease, opacity 600ms ease, r 600ms ease;
+  fill: var(--ink);
+  opacity: 0.82;
+}
+
+.pool-dots .dot.farm,
+.pool-dots .dot.leak {
+  fill: var(--accent);
+  opacity: 1;
+}
+
+.pool-rightful .pool-dots .dot.farm {
+  opacity: 0.12;
+  r: 1.6px;
+}
+
+.pool-rightful .pool-dots .dot.real {
+  fill: var(--good);
+  opacity: 1;
+}
+
+.pool-numbers > div {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 10px;
+}
+
+.pool-label {
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+.pool-share,
+.pool-farms {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: clamp(1.6rem, 4vw, 2.2rem);
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.pool-share {
+  color: var(--good);
+}
+
+.pool-farms {
+  color: var(--accent);
+}
+
+.pool-legend {
+  color: var(--muted);
+  margin: 6px 0 0;
+}
+
+.dot-key {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--ink);
+  vertical-align: middle;
+  margin: 0 2px 0 6px;
+}
+
+.dot-key.farm {
+  background: var(--accent);
+}
+
+/* --- who shares what (console) --------------------------------------------------------------- */
+
+.ring-detail .members {
+  grid-column: 1 / -1;
+}
+
+.ring-graph {
+  margin: 0;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+.ring-graph svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.rg-claim {
+  fill: var(--card);
+  stroke: var(--ink);
+  stroke-width: 1.6;
+}
+
+.rg-claim.unverified {
+  stroke-dasharray: 2 2;
+}
+
+.rg-claim.appealed {
+  stroke: var(--accent);
+  stroke-width: 2.4;
+}
+
+.rg-claim.is-ring {
+  fill: var(--accent);
+}
+
+.rg-claim.is-real {
+  fill: var(--good);
+}
+
+.rg-hub circle {
+  stroke: var(--card);
+  stroke-width: 2;
+}
+
+.rg-count {
+  fill: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  font-family: var(--mono);
+}
+
+.rg-edge {
+  animation: rg-draw 700ms ease-out both;
+}
+
+@keyframes rg-draw {
+  from {
+    stroke-opacity: 0;
+  }
+}
+
+.rg-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 6px 0 0;
+  color: var(--muted);
+}
+
+.rg-key {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  vertical-align: middle;
+  margin-right: 3px;
+}
+
+.rg-key.claim {
+  background: var(--card);
+  border: 1.6px solid var(--ink);
+}
+
+.rg-key.is-ring {
+  background: var(--accent);
+}
+
+.rg-key.is-real {
+  background: var(--good);
+}
+
+/* --- the chain of proof on a receipt --------------------------------------------------------- */
+
+.proof-chain {
+  list-style: none;
+  padding: 0;
+  margin: 14px 0 6px;
+  display: grid;
+  gap: 0;
+}
+
+.proof-chain li {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 12px;
+  align-items: start;
+  position: relative;
+  padding-bottom: 14px;
+  animation: pc-in 420ms ease-out both;
+}
+
+.proof-chain li:nth-child(2) { animation-delay: 120ms; }
+.proof-chain li:nth-child(3) { animation-delay: 240ms; }
+.proof-chain li:nth-child(4) { animation-delay: 360ms; }
+.proof-chain li:nth-child(5) { animation-delay: 480ms; }
+
+@keyframes pc-in {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+}
+
+.proof-chain li:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: 13px;
+  top: 26px;
+  bottom: 0;
+  width: 2px;
+  background: var(--good);
+  opacity: 0.5;
+}
+
+.pc-dot {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--good);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.8rem;
+}

@@ -7,6 +7,8 @@ export function ChecksPanel(props: {
   blurb: ReactNode;
   passed: string;
   run: (onStep: (step: CheckStep) => void) => Promise<boolean>;
+  /** The guided tour's name for this panel. */
+  tour?: string;
 }) {
   const [steps, setSteps] = useState<CheckStep[]>([]);
   const [state, setState] = useState<"idle" | "running" | "passed" | "failed">("idle");
@@ -22,7 +24,7 @@ export function ChecksPanel(props: {
   };
 
   return (
-    <section className={`panel verify ${state}`}>
+    <section className={`panel verify ${state}`} data-tour={props.tour}>
       <div className="panel-head">
         <h2>{props.title}</h2>
         <button className="secondary" onClick={run} disabled={state === "running"}>

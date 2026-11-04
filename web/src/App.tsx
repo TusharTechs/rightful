@@ -4,6 +4,7 @@ import { ClaimPage } from "./pages/ClaimPage.tsx";
 import { ConsolePage } from "./pages/ConsolePage.tsx";
 import { HomePage } from "./pages/HomePage.tsx";
 import { LedgerPage } from "./pages/LedgerPage.tsx";
+import { TourGuide, startTour } from "./components/Tour.tsx";
 
 export function App() {
   const [path, setPath] = useState(() => window.location.pathname);
@@ -36,9 +37,15 @@ export function App() {
           <span className="mark" aria-hidden="true">R</span>
           Rightful
         </Link>
-        <span className="tagline">Agents can file. Only verified humans get paid.</span>
+        <span className="topbar-right">
+          <span className="tagline">Agents can file. Only verified humans get paid.</span>
+          <button className="tour-start" onClick={startTour}>
+            Take the tour
+          </button>
+        </span>
       </header>
       <main>{page}</main>
+      <TourGuide path={path} />
       <footer className="footer">
         <span>PayPal sandbox only. No real money moves.</span>
         <span>

@@ -20,7 +20,7 @@ export function ClaimPage({ id }: { id: string }) {
       </p>
       <h1>{claim.program.title}</h1>
 
-      <section className="panel" aria-live="polite">
+      <section className="panel" aria-live="polite" data-tour="claim-steps">
         <h2>{headline(claim)}</h2>
         <ol className="claim-steps">
           {steps.map((step) => (

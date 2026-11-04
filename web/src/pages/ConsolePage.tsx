@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ApiError, type ConsoleRing, type ConsoleView, type Outcome, type RingMember, consoleApi, tokens } from "../api.ts";
 import { Link } from "../components/Link.tsx";
+import { RingGraph } from "../components/RingGraph.tsx";
 import { StatusPill } from "../components/StatusPill.tsx";
 import { money, short } from "../lib.ts";
 
@@ -170,7 +171,7 @@ function Console({ id, token, onForget }: { id: string; token: string; onForget:
           )}
         </div>
 
-        <div className="tabs" role="tablist">
+        <div className="tabs" role="tablist" data-tour="tabs">
           {(
             [
               ["all", `All ${rings.length}`],
@@ -187,7 +188,7 @@ function Console({ id, token, onForget }: { id: string; token: string; onForget:
         </div>
 
         {reviewing && undecided.length > 0 && (
-          <div className="bulk">
+          <div className="bulk" data-tour="bulk">
             {byRec("deny").length > 0 && (
               <button
                 className="btn danger"
@@ -228,7 +229,7 @@ function Console({ id, token, onForget }: { id: string; token: string; onForget:
           </div>
         )}
 
-        <div className="rings">
+        <div className="rings" data-tour="rings">
           {shown.length === 0 && <p className="muted">Nothing here.</p>}
           {shown.map((ring) => (
             <RingRow
@@ -273,7 +274,7 @@ function Scoreboard({ demo, currency }: { demo: NonNullable<ConsoleView["demo"]>
   ];
   const max = Math.max(...rows.map(([, , o]) => o.shareCents));
   return (
-    <section className="panel scoreboard">
+    <section className="panel scoreboard" data-tour="scoreboard">
       <h2>Where the $2M goes</h2>
       <p className="muted small">
         Scored against the synthetic program's truth: {demo.totals.ringClaims.toLocaleString("en-US")} ring claims and{" "}
@@ -406,6 +407,7 @@ function RingDetail({ ring, reveal, disabled, onDecide, loadMembers }: Parameter
           </div>
         )}
       </div>
+      {members && members.length > 0 && <RingGraph members={members} reveal={reveal} />}
       <div className="members">
         {!members ? (
           <p className="muted small">Loading claims…</p>
@@ -464,7 +466,7 @@ function PayPanel({ view, busy, onPay }: { view: ConsoleView; busy: string | nul
   if (program.status === "review") {
     const ready = projection.undecidedRings === 0;
     return (
-      <section className="panel pay">
+      <section className="panel pay" data-tour="pay">
         <h2>Commit the ledger, then pay</h2>
         <p className="muted">
           {ready
@@ -480,7 +482,7 @@ function PayPanel({ view, busy, onPay }: { view: ConsoleView; busy: string | nul
   }
   const paid = counts.paid ?? 0;
   return (
-    <section className="panel pay done">
+    <section className="panel pay done" data-tour="pay">
       <h2>{program.status === "done" ? `All ${paid.toLocaleString("en-US")} claims paid` : `Paying: ${paid.toLocaleString("en-US")} of ${projection.claims.toLocaleString("en-US")}`}</h2>
       <p className="muted">
         Ledger committed before any money moved: <code>{short(program.commitment, 16)}</code>. Anyone can recompute it, and the drand-picked audit

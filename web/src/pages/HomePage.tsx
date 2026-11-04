@@ -1,5 +1,7 @@
 import { api, claimUrl, type Program } from "../api.ts";
 import { DemoButton } from "../components/DemoButton.tsx";
+import { PoolViz } from "../components/PoolViz.tsx";
+import { startTour } from "../components/Tour.tsx";
 import { Link } from "../components/Link.tsx";
 import { StatusPill } from "../components/StatusPill.tsx";
 import { countdown, money, useNow, usePoll } from "../lib.ts";
@@ -21,7 +23,17 @@ export function HomePage() {
           suspected rings for a person to decide, commits who gets paid what before any money moves, and pays only the account that signed
           in.
         </p>
-        <DemoButton />
+        <PoolViz />
+        <div data-tour="demo">
+          <DemoButton />
+        </div>
+        <p className="tour-invite">
+          First time here?{" "}
+          <button className="tour-link" onClick={startTour}>
+            Take the guided tour
+          </button>{" "}
+          (about four minutes, no sign-in).
+        </p>
       </section>
 
       <section>
