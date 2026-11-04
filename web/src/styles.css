@@ -342,9 +342,28 @@ a.card:hover {
 .panel-head {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
+  align-items: flex-start;
+  gap: 18px;
+}
+
+.panel-head > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.panel-head > button,
+.panel-head > label {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .panel-head {
+    flex-wrap: wrap;
+  }
+  .panel-head > div {
+    flex-basis: 100%;
+  }
 }
 
 .enter-row {
@@ -1991,4 +2010,23 @@ details p {
 
 .rt-tip span {
   color: var(--muted);
+}
+
+.ring-timeline,
+.claims-grid {
+  margin-top: 14px;
+}
+
+.ring-timeline .grid-toolbar > button {
+  min-width: 190px;
+  white-space: nowrap;
+  text-align: center;
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+
+.ring-timeline .grid-toolbar > button:disabled {
+  opacity: 0.75;
+  cursor: progress;
 }
