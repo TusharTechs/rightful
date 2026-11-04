@@ -5,8 +5,8 @@
 Settlement and refund payouts that claim farms cannot drain. Built on PayPal.
 
 > Status: in active development for the PayPal hackathon. Claims, payouts, the public ledger, the
-> audit sample and the ring investigator work end to end on the PayPal sandbox; the administrator
-> console and the hosted judge path are next.
+> audit sample, the ring investigator and the administrator console work end to end; the hosted
+> demo seeds a $2M program for each visitor.
 
 ## The problem
 
@@ -32,6 +32,23 @@ administrators either pay the fraud or freeze everyone while they investigate.
   audit. Anyone can recompute the ledger and the sample in their browser.
 
 ## Try it
+
+**No sign-in:** on the web app, "Run a $2M program as the administrator" seeds your own copy of a
+synthetic settlement: 5,000 claims, about a third filed by rings. You triage 105 held groups with the
+investigator's memos, watch the share each real claimant gets move, commit the ledger and pay
+(simulated Payouts: no sandbox account holds $2M), then verify the ledger and its drand audit in your
+browser. Same program offline:
+
+```bash
+npm run demo                # seed the demo program in-process and print its rings and scoreboard
+```
+
+On the demo program (a held-out seed the investigator was never tuned on), the investigator
+recommends denying 50 groups (1,255 ring claims, no real claimant), clearing 25 (96 real claimants,
+no ring claim) and leaves 30 mixed groups to a person. Paying every claim would send $600,000 of the
+$2M to rings; paying every verified account, $551,176; Rightful, after denying the recommended and the mixed
+groups and clearing the rest, $48,025 (rings it never flagged), with each paid claim up from $400 to
+$631.91.
 
 ```bash
 npm install

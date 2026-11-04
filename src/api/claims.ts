@@ -28,6 +28,8 @@ import {
   reviewProgram,
 } from "../claims/service.ts";
 import { distributeProgram, payoutProof, publicLedger, syncPayouts } from "../claims/distribute.ts";
+import { consoleView, ringMembers } from "../claims/console.ts";
+import { createDemoProgram } from "../demo/seed.ts";
 import type { LoginIntent } from "./login.ts";
 
 const BIND_COOKIE = "rf_bind";
@@ -35,11 +37,15 @@ const BIND_TTL_S = 30 * 60;
 
 export type ClaimRoutesOptions = {
   admin: MiddlewareHandler;
+  /** The admin token, or the console token of the demo program in the path. */
+  programAdmin: MiddlewareHandler;
   /** The API's public origin, for links handed to agents. Defaults to the request's origin. */
   publicBase?: string;
 };
 
 export function mountClaims(app: Hono, deps: ClaimsDeps, options: ClaimRoutesOptions) {
+  const demoLimiter = rateLimiter({ perKey: 6, total: 60, windowMs: 3_600_000 });
+  let demoQueue: Promise<unknown> = Promise.resolve();
   const base = (c: Context) => options.publicBase ?? new URL(c.req.url).origin;
   const secure = (c: Context) => base(c).startsWith("https://");
 
@@ -58,41 +64,66 @@ export function mountClaims(app: Hono, deps: ClaimsDeps, options: ClaimRoutesOpt
     return c.json(await programView(deps, program.id), 201);
   });
 
-  app.post("/api/programs/:id/review", options.admin, async (c) => {
+  app.post("/api/programs/:id/review", options.programAdmin, async (c) => {
     const report = await reviewProgram(deps, id(c), { early: c.req.query("early") === "1" });
     const investigation = await investigateProgram(deps, id(c));
     return c.json({ ...report, investigation });
   });
 
-  app.post("/api/programs/:id/investigate", options.admin, async (c) => c.json(await investigateProgram(deps, id(c))));
+  app.post("/api/programs/:id/investigate", options.programAdmin, async (c) => c.json(await investigateProgram(deps, id(c))));
 
-  app.get("/api/programs/:id/rings", options.admin, async (c) => {
+  app.get("/api/programs/:id/rings", options.programAdmin, async (c) => {
     await getProgram(deps.db, id(c));
     const rings = await deps.db.query<RingRow>(`select * from rings where program_id = $1 order by jsonb_array_length(claim_ids) desc, id`, [id(c)]);
     return c.json(rings.map((r) => ({ id: r.id, claimIds: r.claim_ids, evidence: r.evidence, memo: r.memo, decision: r.decision, decidedAt: r.decided_at })));
   });
 
-  app.post("/api/programs/:id/distribute", options.admin, async (c) => c.json(await distributeProgram(deps, id(c))));
+  app.post("/api/programs/:id/distribute", options.programAdmin, async (c) => c.json(await distributeProgram(deps, id(c))));
 
-  app.post("/api/programs/:id/sync", options.admin, async (c) => c.json(await syncPayouts(deps, id(c))));
+  app.post("/api/programs/:id/sync", options.programAdmin, async (c) => c.json(await syncPayouts(deps, id(c))));
 
-  app.get("/api/programs/:id/claims", options.admin, async (c) => {
+  app.get("/api/programs/:id/claims", options.programAdmin, async (c) => {
     await getProgram(deps.db, id(c));
     const rows = await deps.db.query<ClaimRow>(`select * from claims where program_id = $1 order by filed_at, id`, [id(c)]);
     return c.json(rows.map(adminView));
   });
 
-  app.post("/api/programs/:id/decisions", options.admin, async (c) => {
-    const body = await c.req.json<{ ringId?: string; claimIds?: string[]; decision?: string }>();
-    if (body.decision !== "approve" && body.decision !== "deny") throw new ClaimError("decision must be approve or deny", "invalid");
+  app.post("/api/programs/:id/decisions", options.programAdmin, async (c) => {
+    const body = await c.req.json<{ ringId?: string; ringIds?: string[]; claimIds?: string[]; decision?: string }>();
+    const decision = body.decision;
+    if (decision !== "approve" && decision !== "deny") throw new ClaimError("decision must be approve or deny", "invalid");
+    // Several rings at once is still a person's decision on each: the console lists them first.
+    if (Array.isArray(body.ringIds)) {
+      let changed = 0;
+      for (const ringId of body.ringIds.slice(0, 500).map(String)) changed += await decideClaims(deps, id(c), { ringId }, decision);
+      return c.json({ changed });
+    }
     const selection = body.ringId ? { ringId: body.ringId } : { claimIds: (body.claimIds ?? []).map(String) };
-    return c.json({ changed: await decideClaims(deps, id(c), selection, body.decision) });
+    return c.json({ changed: await decideClaims(deps, id(c), selection, decision) });
+  });
+
+  app.get("/api/programs/:id/console", options.programAdmin, async (c) => c.json(await consoleView(deps, id(c))));
+
+  app.get("/api/programs/:id/rings/:ring", options.programAdmin, async (c) => c.json(await ringMembers(deps, id(c), c.req.param("ring") ?? "")));
+
+  // --- the hosted demo -------------------------------------------------------------------------
+
+  app.post("/api/demo", async (c) => {
+    if (!demoLimiter.allow(clientIp(c), deps.now().getTime())) {
+      return c.json({ error: "rate_limited", message: "Too many demo programs from here in the last hour. Reuse the one you have, or try again later." }, 429);
+    }
+    // One at a time: each copy is 5,000 inserts and a review.
+    const next = demoQueue.catch(() => undefined).then(() => createDemoProgram(deps));
+    demoQueue = next;
+    const demo = await next;
+    return c.json({ programId: demo.program.id, token: demo.token, ...(await programView(deps, demo.program.id)) }, 201);
   });
 
   // --- public and agents -----------------------------------------------------------------------
 
   app.get("/api/programs", async (c) => {
-    const rows = await deps.db.query<{ id: string }>(`select id from programs order by created_at desc limit 20`);
+    // Demo copies are per visitor; they are not listed.
+    const rows = await deps.db.query<{ id: string }>(`select id from programs where kind = 'live' order by created_at desc limit 20`);
     return c.json(await Promise.all(rows.map((row) => programView(deps, row.id))));
   });
 
@@ -199,6 +230,7 @@ async function programView(deps: ClaimsDeps, programId: string) {
   return {
     id: program.id,
     title: program.title,
+    kind: program.kind,
     status: program.status,
     poolCents: program.pool_cents,
     currency: program.currency,
@@ -235,6 +267,27 @@ function adminView(claim: ClaimRow) {
 function formOf(body: Record<string, unknown>) {
   const s = (v: unknown) => (typeof v === "string" ? v : "");
   return { email: s(body.email), address: s(body.address), narrative: s(body.narrative), device: s(body.device) };
+}
+
+/** A fixed-window limit per key and overall. In memory: the API is one instance. */
+function rateLimiter(limits: { perKey: number; total: number; windowMs: number }) {
+  let windowStart = 0;
+  let total = 0;
+  const byKey = new Map<string, number>();
+  return {
+    allow(key: string, now: number): boolean {
+      if (now - windowStart >= limits.windowMs) {
+        windowStart = now;
+        total = 0;
+        byKey.clear();
+      }
+      const used = byKey.get(key) ?? 0;
+      if (used >= limits.perKey || total >= limits.total) return false;
+      byKey.set(key, used + 1);
+      total++;
+      return true;
+    },
+  };
 }
 
 /** Render puts the client first in X-Forwarded-For. */

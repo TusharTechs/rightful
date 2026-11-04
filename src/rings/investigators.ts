@@ -5,12 +5,16 @@
  * - `RecordingInvestigator`: live, and appends every answer to a fixtures file.
  * - `ReplayInvestigator`: answers from that file only. The eval, CI and judges use this, so the
  *   numbers can be reproduced with no API key and no network.
+ * - `CachedInvestigator`: what the API runs. Recorded answers first (so the hosted demo program is
+ *   the same for every visitor, key or not), then live if a key is configured.
  */
 
 import { appendFile, readFile } from "node:fs/promises";
 import { type CaseFile, type Investigator, type Pattern, type Verdict, PATTERNS, caseKey } from "./investigate.ts";
 
 export const FIXTURES = "eval/investigator.jsonl";
+/** Recorded answers for the demo program's rings (`npm run demo:record`). */
+export const DEMO_FIXTURES = "eval/demo-investigator.jsonl";
 
 export function typeSafeInvestigator(options: { model?: string } = {}): Investigator {
   let client: Promise<{ ask: (file: CaseFile) => Promise<Verdict> }> | undefined;
@@ -70,6 +74,20 @@ export class ReplayInvestigator implements Investigator {
     const verdict = this.fixtures.get(caseKey(file));
     if (!verdict) throw new Error(`no recorded answer for case ${caseKey(file)}; record it first: npm run eval:investigator -- --mode record`);
     return verdict;
+  }
+}
+
+export class CachedInvestigator implements Investigator {
+  constructor(
+    private readonly fixtures: ReadonlyMap<string, Verdict>,
+    private readonly live?: Investigator,
+  ) {}
+
+  async investigate(file: CaseFile): Promise<Verdict> {
+    const known = this.fixtures.get(caseKey(file));
+    if (known) return known;
+    if (!this.live) throw new Error(`no recorded answer for case ${caseKey(file)} and no TYPESAFE_API_KEY to ask live`);
+    return this.live.investigate(file);
   }
 }
 

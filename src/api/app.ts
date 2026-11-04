@@ -9,7 +9,8 @@
 import { timingSafeEqual } from "node:crypto";
 import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
-import { type ClaimsDeps, ClaimError } from "../claims/service.ts";
+import { type ClaimsDeps, ClaimError, getProgram } from "../claims/service.ts";
+import { isDemoToken } from "../demo/seed.ts";
 import { PayPalError } from "../paypal/client.ts";
 import { claimantAfterLogin, mountClaims } from "./claims.ts";
 import { type LoginConfig, mountLogin } from "./login.ts";
@@ -39,16 +40,31 @@ export function createApp(deps: ClaimsDeps, options: AppOptions) {
     return c.json({ error: "internal" }, 500);
   });
 
-  const admin = async (c: Context, next: () => Promise<void>) => {
-    const given = Buffer.from(c.req.header("authorization")?.replace(/^Bearer /, "") ?? "");
+  const bearer = (c: Context) => c.req.header("authorization")?.replace(/^Bearer /, "") ?? "";
+  const isAdmin = (token: string) => {
+    const given = Buffer.from(token);
     const expected = Buffer.from(options.adminToken);
-    if (given.length !== expected.length || !timingSafeEqual(given, expected)) return c.json({ error: "unauthorized" }, 401);
+    return given.length === expected.length && timingSafeEqual(given, expected);
+  };
+  const admin = async (c: Context, next: () => Promise<void>) => {
+    if (!isAdmin(bearer(c))) return c.json({ error: "unauthorized" }, 401);
     await next();
+  };
+  // Program actions also accept that program's console token, which exists only for demo programs.
+  const programAdmin = async (c: Context, next: () => Promise<void>) => {
+    const token = bearer(c);
+    if (isAdmin(token)) return next();
+    const programId = c.req.param("id") ?? "";
+    if (token && isDemoToken(deps.humanSecret, programId, token)) {
+      const program = await getProgram(deps.db, programId).catch(() => null);
+      if (program?.kind === "demo") return next();
+    }
+    return c.json({ error: "unauthorized" }, 401);
   };
 
   app.get("/health", (c) => c.json({ ok: true }));
 
-  mountClaims(app, deps, { admin, publicBase: options.publicBase });
+  mountClaims(app, deps, { admin, programAdmin, publicBase: options.publicBase });
 
   return app;
 }

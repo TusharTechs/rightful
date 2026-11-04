@@ -1,5 +1,6 @@
 import { payoutIsInLedger } from "../../../src/claims/ledger.ts";
-import { api, ApiError, type PayoutReceipt, type Program, type PublicLedger } from "../api.ts";
+import { Link } from "../components/Link.tsx";
+import { api, ApiError, tokens, type PayoutReceipt, type Program, type PublicLedger } from "../api.ts";
 import { ChecksPanel } from "../components/ChecksPanel.tsx";
 import { money, short, usePoll } from "../lib.ts";
 import { verifyPublishedLedger } from "../verify-ledger.ts";
@@ -42,7 +43,19 @@ export function LedgerPage({ id, claimId }: { id: string; claimId: string | null
     <article className="receipt">
       <p className="muted small">
         Payout ledger · program <code>{id}</code>
+        {program.kind === "demo" && tokens.get(id) && (
+          <>
+            {" · "}
+            <Link to={`/console/${id}`}>back to the console</Link>
+          </>
+        )}
       </p>
+      {program.kind === "demo" && (
+        <p className="demo-banner">
+          <strong>Demo program.</strong> The claimants are synthetic and the Payouts batches simulated; the ledger, its commitment, the drand round
+          and the audit sample below are real and check out exactly as a live program's do.
+        </p>
+      )}
       <section className="outcome good">
         <h1>{program.title}</h1>
         <p>

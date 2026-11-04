@@ -204,11 +204,14 @@ main {
   color: var(--good);
 }
 
+.pill-review,
+.pill-distributing,
 .pill-sealed,
 .pill-drawn {
   color: var(--accent);
 }
 
+.pill-done,
 .pill-settled,
 .pill-cancelled {
   color: var(--muted);
@@ -588,5 +591,405 @@ details p {
   *::after {
     animation: none !important;
     transition: none !important;
+  }
+}
+
+/* --- administrator console ------------------------------------------------------------------- */
+
+.shell.wide {
+  max-width: 1180px;
+}
+
+.demo-cta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+  margin: 22px 0 8px;
+}
+
+.demo-cta .small {
+  flex-basis: 100%;
+}
+
+.demo-banner {
+  background: color-mix(in srgb, var(--paypal) 22%, var(--card));
+  border: 1px solid color-mix(in srgb, var(--paypal) 60%, var(--line));
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 0.9rem;
+  margin: 0 0 12px;
+}
+
+.console-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.console-head h1 {
+  margin: 4px 0 8px;
+  font-size: clamp(1.5rem, 3vw, 2.1rem);
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.stat {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stat.warn {
+  border-color: var(--accent);
+}
+
+.stat.good .stat-value {
+  color: var(--good);
+}
+
+.stat-label {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.stat-value {
+  font-family: var(--display);
+  font-size: 1.55rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-detail {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.score-row {
+  display: grid;
+  grid-template-columns: minmax(200px, 1.2fr) 2fr minmax(210px, 1fr);
+  gap: 14px;
+  align-items: center;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+
+.score-row.ours .score-bar span {
+  background: var(--good);
+}
+
+.score-name,
+.score-nums {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-variant-numeric: tabular-nums;
+}
+
+.score-bar {
+  height: 12px;
+  border-radius: 999px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.score-bar span {
+  display: block;
+  height: 100%;
+  background: var(--muted);
+  border-radius: 999px;
+  transition: width 0.5s ease;
+}
+
+.bad-text {
+  color: var(--bad);
+  font-weight: 600;
+}
+
+.good-text {
+  color: var(--good);
+  font-weight: 600;
+}
+
+.toggle {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 14px 0 10px;
+}
+
+.tab {
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 0.88rem;
+}
+
+.tab.active {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+
+.bulk {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin: 6px 0 14px;
+}
+
+.btn {
+  display: inline-block;
+  background: var(--card);
+  color: var(--ink);
+  border: 1.5px solid var(--ink);
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.btn.danger {
+  background: var(--bad);
+  border-color: var(--bad);
+  color: #fff;
+}
+
+.rings {
+  display: grid;
+  gap: 6px;
+}
+
+.ring {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.ring.open {
+  border-color: var(--ink);
+}
+
+.ring.decided {
+  opacity: 0.72;
+}
+
+.ring-summary {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 52px 1fr 150px auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  background: transparent;
+  color: inherit;
+  border: 0;
+  text-align: left;
+}
+
+.ring-size {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 1.25rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.ring-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.ring-main .small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ring-odds {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.odds-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.odds-bar span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.chip {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.chip-deny {
+  background: var(--bad-bg);
+  color: var(--bad);
+}
+
+.chip-clear {
+  background: var(--good-bg);
+  color: var(--good);
+}
+
+.chip-review {
+  background: color-mix(in srgb, var(--paypal) 30%, var(--card));
+  color: var(--ink);
+}
+
+.chip-denied,
+.chip-cleared {
+  border: 1px solid currentColor;
+  color: var(--muted);
+}
+
+.chip.truth {
+  border: 1px dashed currentColor;
+}
+
+.truth-ring {
+  color: var(--bad);
+}
+
+.truth-real {
+  color: var(--good);
+}
+
+.ring-detail {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) 2fr;
+  gap: 18px;
+  padding: 4px 14px 16px;
+  border-top: 1px solid var(--line);
+}
+
+.memo h3 {
+  font-size: 1rem;
+  margin: 12px 0 6px;
+}
+
+.memo ul {
+  margin: 0 0 8px;
+  padding-left: 18px;
+}
+
+.decide {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.members {
+  overflow: auto;
+  max-height: 420px;
+  margin-top: 12px;
+}
+
+.members table {
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  width: 100%;
+}
+
+.members th,
+.members td {
+  text-align: left;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+
+.members th {
+  position: sticky;
+  top: 0;
+  background: var(--card);
+  font-weight: 600;
+}
+
+.members .story {
+  min-width: 240px;
+  color: var(--muted);
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+.mono {
+  font-family: var(--mono);
+}
+
+.tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  background: var(--line);
+}
+
+.tag.warn {
+  background: var(--bad-bg);
+  color: var(--bad);
+}
+
+.text-input {
+  font: inherit;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+  min-width: 260px;
+}
+
+@media (max-width: 760px) {
+  .ring-summary {
+    grid-template-columns: 40px 1fr auto;
+  }
+  .ring-odds,
+  .chip.truth {
+    display: none;
+  }
+  .ring-detail,
+  .score-row {
+    grid-template-columns: 1fr;
   }
 }

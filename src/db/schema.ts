@@ -59,6 +59,14 @@ alter table programs add column if not exists audit_randomness text;
 alter table programs add column if not exists audit_signature text;
 alter table programs add column if not exists audit_sample jsonb;
 
+-- Demo programs are seeded from the synthetic generator, pay by a simulated Payouts (a $2M pool is
+-- more than a sandbox account holds), and keep each claim's ground truth for the console's scoreboard.
+alter table programs add column if not exists kind text not null default 'live' check (kind in ('live', 'demo'));
+alter table claims add column if not exists demo_truth text;
+-- The smallest group the ring detector reports. Lower is more sensitive: it also flags households,
+-- which the investigator and a person then clear.
+alter table programs add column if not exists ring_min_size integer not null default 5 check (ring_min_size >= 3);
+
 create index if not exists claims_by_program on claims (program_id, status);
 
 -- Suspected rings from the latest review, the investigator's memo, and a person's decision.

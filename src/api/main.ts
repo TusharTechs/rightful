@@ -13,7 +13,7 @@ import { FakePayouts } from "../dev/fake-payouts.ts";
 import { verifiedBeacon } from "../engine/drand.ts";
 import { PayPalClient } from "../paypal/client.ts";
 import { getUserInfo } from "../paypal/identity.ts";
-import { typeSafeInvestigator } from "../rings/investigators.ts";
+import { CachedInvestigator, DEMO_FIXTURES, FIXTURES, loadFixtures, typeSafeInvestigator } from "../rings/investigators.ts";
 import { createApp } from "./app.ts";
 
 export type Server = { url: string; deps: ClaimsDeps; adminToken: string; close: () => Promise<void> };
@@ -51,8 +51,12 @@ export async function buildRuntime(env: NodeJS.ProcessEnv = process.env): Promis
     humanSecret,
     now: () => new Date(),
     payouts: paypal ? payoutsPort(paypal) : new FakePayouts(),
-    // The ring investigator runs only with a TypeSafe key; without one, rings carry evidence alone.
-    investigator: env.TYPESAFE_API_KEY ? typeSafeInvestigator() : undefined,
+    // Recorded answers first (the demo program's rings are all recorded), then TypeSafe live if a key
+    // is set. Without either, a ring carries the detector's evidence alone and a person decides.
+    investigator: new CachedInvestigator(
+      new Map([...(await loadFixtures(FIXTURES)), ...(await loadFixtures(DEMO_FIXTURES))]),
+      env.TYPESAFE_API_KEY ? typeSafeInvestigator() : undefined,
+    ),
     beacon: verifiedBeacon,
   };
   return { deps, paypal, publicBase, production, adminToken };

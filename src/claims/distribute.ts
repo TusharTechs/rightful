@@ -19,6 +19,8 @@ import { openPayee, claimKeys } from "./pass.ts";
 import { NOT_PAID, PAID, type PayoutsPort } from "./payouts-port.ts";
 import { type ClaimsDeps, type ProgramRow, ClaimError, getClaim, getProgram } from "./service.ts";
 import type { Db } from "../db/db.ts";
+import { simulatedPayouts } from "../demo/simulated-payouts.ts";
+import { pruneDemos } from "../demo/seed.ts";
 
 /** PayPal allows 15,000 items per batch; smaller batches fail and retry in smaller pieces. */
 export const BATCH_SIZE = 5000;
@@ -35,7 +37,7 @@ export type DistributionReport = {
 };
 
 export async function distributeProgram(deps: ClaimsDeps, programId: string): Promise<DistributionReport> {
-  const payouts = payoutsOf(deps);
+  const payouts = payoutsOf(deps, await getProgram(deps.db, programId));
   const program = await deps.db.transaction(async (tx) => {
     const program = await getProgram(tx, programId, true);
     if (program.status === "distributing") return program;
@@ -105,7 +107,7 @@ export async function syncPayouts(deps: ClaimsDeps, programId: string): Promise<
   const program = await getProgram(deps.db, programId);
   const audit = await drawAudit(deps, program);
   if (program.status === "distributing") {
-    const payouts = payoutsOf(deps);
+    const payouts = payoutsOf(deps, program);
     for (const batch of program.payout_batches) {
       if (!batch.batchId) continue;
       const items = await payouts.items(batch.batchId);
@@ -218,10 +220,17 @@ export async function tickClaims(deps: ClaimsDeps): Promise<{ synced: string[]; 
       report.errors.push({ program: id, error: err instanceof Error ? err.message : String(err) });
     }
   }
+  try {
+    await pruneDemos(deps);
+  } catch (err) {
+    report.errors.push({ program: "demo", error: err instanceof Error ? err.message : String(err) });
+  }
   return report;
 }
 
-function payoutsOf(deps: ClaimsDeps): PayoutsPort {
+/** Demo programs pay by simulation (see `simulated-payouts.ts`); live programs by PayPal. */
+function payoutsOf(deps: ClaimsDeps, program: ProgramRow): PayoutsPort {
+  if (program.kind === "demo") return simulatedPayouts(deps.db, BATCH_SIZE);
   if (!deps.payouts) throw new ClaimError("payouts are not configured on this server", "wrong_state");
   return deps.payouts;
 }

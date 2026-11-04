@@ -56,6 +56,9 @@ export type ProgramRow = {
   audit_randomness: string | null;
   audit_signature: string | null;
   audit_sample: string[] | null;
+  kind: "live" | "demo";
+  ring_min_size: number;
+  created_at: Date;
 };
 
 export type ClaimRow = {
@@ -79,6 +82,8 @@ export type ClaimRow = {
   payout_status: string | null;
   filed_at: Date;
   bound_at: Date | null;
+  /** Demo programs only: the synthetic generator's truth, e.g. `ring:device-farm` or `genuine:household`. */
+  demo_truth: string | null;
 };
 
 export class ClaimError extends Error {
@@ -222,7 +227,7 @@ export async function reviewProgram(deps: ClaimsDeps, programId: string, options
          and not (status = 'approved' and ring_id is not null) order by id`,
       [program.id],
     );
-    const rings = findRings(claims.map(signalsOf), { sampleText: program.sample_text }).map((ring) => ({ ...ring, id: ringIdFor(ring.claimIds) }));
+    const rings = findRings(claims.map(signalsOf), { sampleText: program.sample_text, minRingSize: program.ring_min_size }).map((ring) => ({ ...ring, id: ringIdFor(ring.claimIds) }));
     await tx.query(`delete from rings where program_id = $1 and decision is null`, [program.id]);
     for (const ring of rings) {
       const { claimIds, ...evidence } = ring;
@@ -235,17 +240,25 @@ export async function reviewProgram(deps: ClaimsDeps, programId: string, options
 
     let approved = 0;
     const held = { ring: 0, unverified: 0 };
+    const updates = { ids: [] as string[], statuses: [] as string[], reasons: [] as (string | null)[], rings: [] as (string | null)[] };
     for (const claim of claims) {
       const ring = ringOf.get(claim.id) ?? null;
       const unverified = program.require_verified && !claim.verified;
       const [status, reason] = ring ? ["held", "ring"] : unverified ? ["held", "unverified"] : ["approved", null];
       if (status === "approved") approved++;
       else held[reason as "ring" | "unverified"]++;
-      await tx.query(
-        `update claims set status = $2, hold_reason = $3, ring_id = $4, updated_at = now() where id = $1`,
-        [claim.id, status, reason, ring],
-      );
+      updates.ids.push(claim.id);
+      updates.statuses.push(status!);
+      updates.reasons.push(reason);
+      updates.rings.push(ring);
     }
+    // One statement for the whole program: a $2M program has tens of thousands of claims.
+    await tx.query(
+      `update claims c set status = u.status, hold_reason = u.reason, ring_id = u.ring, updated_at = now()
+       from unnest($1::text[], $2::text[], $3::text[], $4::text[]) as u(id, status, reason, ring)
+       where c.id = u.id`,
+      [updates.ids, updates.statuses, updates.reasons, updates.rings],
+    );
     const [unbound] = await tx.query<{ n: number }>(
       `select count(*)::int as n from claims where program_id = $1 and status = 'unbound'`,
       [program.id],

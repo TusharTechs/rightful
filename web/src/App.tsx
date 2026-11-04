@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "./components/Link.tsx";
+import { ConsolePage } from "./pages/ConsolePage.tsx";
 import { HomePage } from "./pages/HomePage.tsx";
 import { LedgerPage } from "./pages/LedgerPage.tsx";
 
@@ -15,10 +16,17 @@ export function App() {
   }, []);
 
   const ledger = /^\/l\/([\w-]+)\/?$/.exec(path);
-  const page = ledger ? <LedgerPage id={ledger[1]!} claimId={new URLSearchParams(window.location.search).get("claim")} /> : <HomePage />;
+  const consoleMatch = /^\/console\/([\w-]+)\/?$/.exec(path);
+  const page = ledger ? (
+    <LedgerPage id={ledger[1]!} claimId={new URLSearchParams(window.location.search).get("claim")} />
+  ) : consoleMatch ? (
+    <ConsolePage key={consoleMatch[1]} id={consoleMatch[1]!} />
+  ) : (
+    <HomePage />
+  );
 
   return (
-    <div className="shell">
+    <div className={consoleMatch ? "shell wide" : "shell"}>
       <header className="topbar">
         <Link to="/" className="wordmark">
           <span className="mark" aria-hidden="true">R</span>
