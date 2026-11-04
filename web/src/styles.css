@@ -993,3 +993,7 @@ details p {
     grid-template-columns: 1fr;
   }
 }
+
+.checks .skipped {
+  opacity: 0.75;
+}

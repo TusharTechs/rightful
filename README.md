@@ -29,6 +29,9 @@ administrators either pay the fraud or freeze everyone while they investigate.
   hashed into a Merkle root that also names a drand round still in the future. Each claimant gets a
   receipt proving their payout is in it. Once anyone has kept the root or a receipt, adding or
   changing a payout breaks the match: the ledger is tamper-evident, not tamper-proof.
+- **PayPal keeps a copy.** Every Payouts batch carries the ledger's digest in its message, and every
+  payment carries it in its note, so each claimant's own PayPal payment names the ledger it was paid
+  from. The verifier checks that PayPal's records, read back from PayPal, all name this ledger.
 - **Paid to the account that signed in.** PayPal Payouts sends each share with
   `recipient_type: PAYPAL_ID` to the payer ID captured at sign-in, and nowhere else.
 - **An audit nobody picks.** Once the committed drand round is out, its randomness picks the claims to

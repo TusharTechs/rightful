@@ -48,7 +48,12 @@ export type ProgramRow = {
   sample_text: string;
   closes_at: Date;
   share_cents: number | null;
-  payout_batches: Array<{ senderBatchId: string; batchId: string | null }>;
+  payout_batches: Array<{
+    senderBatchId: string;
+    batchId: string | null;
+    /** What PayPal returned for the batch at the last sync: does its record carry the ledger anchor? */
+    paypal?: { timeCreated: string | null; messageAnchored: boolean; items: number; itemsAnchored: number };
+  }>;
   commitment_root: string | null;
   commitment_digest: string | null;
   audit_round: number | null;

@@ -33,9 +33,9 @@ export function ChecksPanel(props: {
       {steps.length > 0 && (
         <ul className="checks">
           {steps.map((step) => (
-            <li key={step.label} className={step.ok ? "ok" : "bad"}>
+            <li key={step.label} className={step.skipped ? "skipped" : step.ok ? "ok" : "bad"}>
               <span className="mark-icon" aria-hidden="true">
-                {step.ok ? "✓" : "✗"}
+                {step.skipped ? "–" : step.ok ? "✓" : "✗"}
               </span>
               <div>
                 <strong>{step.label}</strong>

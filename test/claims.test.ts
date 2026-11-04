@@ -11,13 +11,14 @@ import {
   fileClaim,
   type RingRow,
   getClaim,
+  getProgram,
   investigateProgram,
   passAfterLogin,
   reviewProgram,
 } from "../src/claims/service.ts";
 import type { Investigator } from "../src/rings/investigate.ts";
 import { distributeProgram, payoutProof, publicLedger, syncPayouts, tickClaims } from "../src/claims/distribute.ts";
-import { payoutIsInLedger, verifyLedger } from "../src/claims/ledger.ts";
+import { ledgerAnchor, payoutIsInLedger, verifyLedger } from "../src/claims/ledger.ts";
 import { timeOfRound } from "../src/engine/drand.ts";
 import { openPGlite } from "../src/db/db.ts";
 import { FakePayouts } from "../src/dev/fake-payouts.ts";
@@ -228,6 +229,7 @@ test("approved claims are paid an equal share, by PayPal ID, once, and only afte
   const [sent] = [...payouts.batches.values()];
   assert.deepEqual(sent!.request.items.map((i) => i.payerId).sort(), ["PAY_0", "PAY_1", "PAY_2"], "only approved accounts, by their own payer IDs");
   assert.ok(sent!.request.items.every((i) => i.amountCents === 33_333));
+  assert.equal(sent!.request.anchor, ledgerAnchor((await getProgram(deps.db, program.id)).commitment_digest!), "PayPal's record will name the ledger");
 
   const again = await distributeProgram(deps, program.id);
   assert.deepEqual(again.batches, report.batches);
@@ -249,6 +251,10 @@ test("approved claims are paid an equal share, by PayPal ID, once, and only afte
   assert.equal(audit!.length, 3, "three payouts: all are audited");
   const published = await publicLedger(deps, program.id);
   assert.deepEqual(verifyLedger(published.terms, published.payouts, { commitment: published.commitment, sample: published.audit!.sample }, published.audit!), []);
+  assert.deepEqual(published.paypal, {
+    anchor: ledgerAnchor(published.commitment.digest),
+    batches: [{ batchId: "FAKEBATCH1", timeCreated: "2026-11-04T00:00:00Z", messageAnchored: true, items: 3, itemsAnchored: 3 }],
+  });
   const receipt = await payoutProof(deps, published.payouts[0]!.claimId);
   assert.ok(payoutIsInLedger(published.commitment.root, program.id, receipt.payout, receipt.proof));
   assert.doesNotMatch(JSON.stringify(published), /PAY_|RING_|payee|@example/, "no payer IDs or personal data in the public ledger");

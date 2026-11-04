@@ -14,14 +14,19 @@ export type PayoutRequest = {
   senderBatchId: string;
   currency: string;
   emailSubject: string;
+  /** The ledger anchor (`ledgerAnchor`), written into the batch message and every item's note. */
+  anchor: string;
   items: { claimId: string; payerId: string; amountCents: number }[];
 };
 
-export type PayoutItemState = { claimId: string; payoutItemId: string; status: string };
+export type PayoutItemState = { claimId: string; payoutItemId: string; status: string; note?: string };
+
+/** A batch as PayPal holds it: every item, and the message and time PayPal recorded with it. */
+export type BatchReadback = { items: PayoutItemState[]; emailMessage: string | null; timeCreated: string | null };
 
 export interface PayoutsPort {
   send(request: PayoutRequest): Promise<{ batchId: string }>;
-  items(batchId: string): Promise<PayoutItemState[]>;
+  read(batchId: string): Promise<BatchReadback>;
 }
 
 const PAGE_SIZE = 1000;
@@ -32,24 +37,29 @@ export function payoutsPort(client: PayPalClient): PayoutsPort {
       const batch = await createPayoutBatch(client, {
         senderBatchId: request.senderBatchId,
         emailSubject: request.emailSubject,
+        emailMessage: `Payout ledger ${request.anchor}. Your claim receipt shows the same digest.`,
         items: request.items.map((item) => ({
           itemId: item.claimId,
           recipientType: "PAYPAL_ID",
           receiver: item.payerId,
           amountCents: item.amountCents,
           currency: request.currency,
-          note: "Your approved claim",
+          note: `Your approved claim. ${request.anchor}`,
         })),
       });
       return { batchId: batch.batch_header.payout_batch_id };
     },
-    async items(batchId) {
-      const out: PayoutItemState[] = [];
+    async read(batchId) {
+      const out: BatchReadback = { items: [], emailMessage: null, timeCreated: null };
       for (let page = 1; ; page++) {
         const batch = await getPayoutBatch(client, batchId, { page, pageSize: PAGE_SIZE });
+        if (page === 1) {
+          out.emailMessage = batch.batch_header.sender_batch_header?.email_message ?? null;
+          out.timeCreated = batch.batch_header.time_created ?? null;
+        }
         for (const item of batch.items ?? []) {
           const claimId = item.payout_item?.sender_item_id;
-          if (claimId) out.push({ claimId, payoutItemId: item.payout_item_id, status: item.transaction_status ?? "PENDING" });
+          if (claimId) out.items.push({ claimId, payoutItemId: item.payout_item_id, status: item.transaction_status ?? "PENDING", note: item.payout_item?.note });
         }
         if ((batch.items ?? []).length < PAGE_SIZE) return out;
       }

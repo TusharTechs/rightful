@@ -3,7 +3,7 @@
  * returns the original batch, and items settle a read or two after they are sent.
  */
 
-import type { PayoutItemState, PayoutRequest, PayoutsPort } from "../claims/payouts-port.ts";
+import type { BatchReadback, PayoutRequest, PayoutsPort } from "../claims/payouts-port.ts";
 
 export class FakePayouts implements PayoutsPort {
   readonly batches = new Map<string, { request: PayoutRequest; reads: number }>();
@@ -22,14 +22,19 @@ export class FakePayouts implements PayoutsPort {
     return { batchId };
   }
 
-  async items(batchId: string): Promise<PayoutItemState[]> {
+  async read(batchId: string): Promise<BatchReadback> {
     const batch = this.batches.get(batchId);
     if (!batch) throw new Error(`no fake batch ${batchId}`);
     const settled = batch.reads++ >= 1;
-    return batch.request.items.map((item, i) => ({
-      claimId: item.claimId,
-      payoutItemId: `${batchId}-ITEM${i + 1}`,
-      status: !settled ? "PENDING" : this.failing.has(item.payerId) ? "FAILED" : "SUCCESS",
-    }));
+    return {
+      emailMessage: `Payout ledger ${batch.request.anchor}.`,
+      timeCreated: "2026-11-04T00:00:00Z",
+      items: batch.request.items.map((item, i) => ({
+        claimId: item.claimId,
+        payoutItemId: `${batchId}-ITEM${i + 1}`,
+        status: !settled ? "PENDING" : this.failing.has(item.payerId) ? "FAILED" : "SUCCESS",
+        note: `Your approved claim. ${batch.request.anchor}`,
+      })),
+    };
   }
 }

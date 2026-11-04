@@ -14,7 +14,7 @@
 
 import { type InclusionProof } from "../engine/merkle.ts";
 import { QUICKNET, roundAtOrAfter, timeOfRound } from "../engine/drand.ts";
-import { type DistributionTerms, type LedgerCommitment, type PayoutLeaf, auditSample, auditSizeFor, commitDistribution, provePayout } from "./ledger.ts";
+import { type DistributionTerms, type LedgerCommitment, type PayoutLeaf, auditSample, auditSizeFor, commitDistribution, ledgerAnchor, provePayout } from "./ledger.ts";
 import { openPayee, claimKeys } from "./pass.ts";
 import { NOT_PAID, PAID, type PayoutsPort } from "./payouts-port.ts";
 import { type ClaimsDeps, type ProgramRow, ClaimError, getClaim, getProgram } from "./service.ts";
@@ -85,6 +85,7 @@ export async function distributeProgram(deps: ClaimsDeps, programId: string): Pr
       senderBatchId: batch.senderBatchId,
       currency: program.currency,
       emailSubject: `Your payment from ${program.title}`,
+      anchor: ledgerAnchor(program.commitment_digest!),
       items: slice.map((claim) => ({ claimId: claim.id, payerId: openPayee(payeeKey, claim.payee_sealed), amountCents: claim.amount_cents })),
     });
     batches[i] = { ...batch, batchId };
@@ -108,9 +109,23 @@ export async function syncPayouts(deps: ClaimsDeps, programId: string): Promise<
   const audit = await drawAudit(deps, program);
   if (program.status === "distributing") {
     const payouts = payoutsOf(deps, program);
-    for (const batch of program.payout_batches) {
+    const anchor = ledgerAnchor(program.commitment_digest!);
+    const batches = [...program.payout_batches];
+    for (const [i, batch] of batches.entries()) {
       if (!batch.batchId) continue;
-      const items = await payouts.items(batch.batchId);
+      const readback = await payouts.read(batch.batchId);
+      const items = readback.items;
+      if (program.kind !== "demo") {
+        batches[i] = {
+          ...batch,
+          paypal: {
+            timeCreated: readback.timeCreated,
+            messageAnchored: (readback.emailMessage ?? "").includes(anchor),
+            items: items.length,
+            itemsAnchored: items.filter((item) => (item.note ?? "").includes(anchor)).length,
+          },
+        };
+      }
       if (items.length === 0) continue;
       await deps.db.query(
         `update claims c set payout_item_id = u.item, payout_status = u.status, updated_at = now(),
@@ -123,6 +138,7 @@ export async function syncPayouts(deps: ClaimsDeps, programId: string): Promise<
         [program.id, items.map((i) => i.claimId), items.map((i) => i.payoutItemId), items.map((i) => i.status), [...PAID], [...NOT_PAID]],
       );
     }
+    await deps.db.query(`update programs set payout_batches = $2::jsonb where id = $1`, [program.id, JSON.stringify(batches)]);
   }
   const counts = await deps.db.query<{ status: string; n: number }>(
     `select status, count(*)::int as n from claims where program_id = $1 and amount_cents is not null group by status`,
@@ -156,6 +172,11 @@ export type PublicLedger = {
   commitment: LedgerCommitment;
   payouts: PayoutLeaf[];
   audit: { round: number; randomness: string; signature: string; sample: string[] } | null;
+  /**
+   * What PayPal's own records of each batch carry, as read back from PayPal by the API. Null for
+   * demo programs, whose payouts are simulated and so have no PayPal record.
+   */
+  paypal: { anchor: string; batches: Array<{ batchId: string; timeCreated: string | null; messageAnchored: boolean; items: number; itemsAnchored: number } | { batchId: string; pending: true }> } | null;
 };
 
 /** Everything anyone needs to check the distribution. No payer IDs, no personal data. */
@@ -170,6 +191,15 @@ export async function publicLedger(deps: ClaimsDeps, programId: string): Promise
     audit: program.audit_sample
       ? { round: program.audit_round!, randomness: program.audit_randomness!, signature: program.audit_signature!, sample: program.audit_sample }
       : null,
+    paypal:
+      program.kind === "demo"
+        ? null
+        : {
+            anchor: ledgerAnchor(program.commitment_digest),
+            batches: program.payout_batches
+              .filter((b) => b.batchId)
+              .map((b) => (b.paypal ? { batchId: b.batchId!, ...b.paypal } : { batchId: b.batchId!, pending: true as const })),
+          },
   };
 }
 

@@ -33,6 +33,14 @@ export type DistributionTerms = {
 
 export type LedgerCommitment = { root: string; payoutCount: number; digest: string };
 
+/**
+ * What Rightful writes into PayPal's own records of a payout batch: the batch message and every
+ * item's note carry it, so each claimant's PayPal payment names the ledger it was paid from.
+ */
+export function ledgerAnchor(digest: string): string {
+  return `rightful/ledger/v1 ${digest}`;
+}
+
 /** How many payouts are audited: all of them up to 25, then 25. */
 export const auditSizeFor = (payouts: number) => Math.min(payouts, 25);
 

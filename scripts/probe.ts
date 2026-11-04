@@ -2,7 +2,7 @@
  * Day-0 sandbox probes: find out what this PayPal sandbox app can actually do before any feature
  * depends on it.
  *
- *   npm run probe -- <name...>     names: token drand reporting webhooks payouts payout-id login jev
+ *   npm run probe -- <name...>     names: token drand reporting webhooks payouts payout-id payout-note login jev
  *   npm run probe -- all
  *
  * The login probe prints a link. Open it, sign in as one of your
@@ -14,7 +14,7 @@ import { createServer, type Server } from "node:http";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { randomBytes, randomUUID } from "node:crypto";
 import { PayPalClient, PayPalError } from "../src/paypal/client.ts";
-import { createPayoutBatch, getPayoutBatch } from "../src/paypal/payouts.ts";
+import { createPayoutBatch, getPayoutBatch, getPayoutItem } from "../src/paypal/payouts.ts";
 import { listWebhooks, searchTransactions } from "../src/paypal/reporting.ts";
 import { getUserInfo, isVerified, loginUrl } from "../src/paypal/identity.ts";
 import { auditSample, auditSizeFor, commitDistribution } from "../src/claims/ledger.ts";
@@ -167,6 +167,37 @@ const probes: Record<string, () => Promise<Omit<Finding, "probe" | "at">>> = {
     };
   },
 
+  /**
+   * Does PayPal hand back what we write into a batch? Rightful anchors its ledger digest in the
+   * batch's email_message and each item's note, so the read-back must return them verbatim.
+   */
+  async "payout-note"() {
+    const email = process.env.PAYPAL_SANDBOX_PAYOUT_EMAIL;
+    if (!email) return skip("set PAYPAL_SANDBOX_PAYOUT_EMAIL to a sandbox Personal account");
+    const client = paypal();
+    const anchor = `rightful/ledger/v1 ${randomUUID().replace(/-/g, "")}${randomUUID().replace(/-/g, "")}`;
+    const batch = await createPayoutBatch(client, {
+      senderBatchId: `probe-note-${randomUUID()}`,
+      emailSubject: "Rightful sandbox probe",
+      emailMessage: `Ledger ${anchor}`,
+      items: [{ itemId: "probe-note", recipientType: "EMAIL", receiver: email, amountCents: 1, note: `Your approved claim. ${anchor}` }],
+    });
+    await sleep(5000);
+    const status = await getPayoutBatch(client, batch.batch_header.payout_batch_id);
+    const header = status.batch_header.sender_batch_header ?? {};
+    const itemId = status.items?.[0]?.payout_item_id;
+    const item = itemId ? await getPayoutItem(client, itemId) : undefined;
+    const facts = {
+      batchEmailMessage: header.email_message ?? null,
+      batchEmailMessageMatches: (header.email_message ?? "").includes(anchor),
+      batchListItemNote: status.items?.[0]?.payout_item?.note ?? null,
+      itemNote: item?.payout_item?.note ?? null,
+      itemNoteMatches: (item?.payout_item?.note ?? "").includes(anchor),
+      itemStatus: item?.transaction_status ?? null,
+    };
+    return { ok: facts.batchEmailMessageMatches || facts.itemNoteMatches, summary: `email_message ${facts.batchEmailMessageMatches ? "returned" : "not returned"}; item note ${facts.itemNoteMatches ? "returned" : "not returned"}`, facts };
+  },
+
   async login() {
     const client = paypal();
     const redirectUri = process.env.PAYPAL_LIPP_REDIRECT_URI || `${BASE}/callback`;
@@ -214,7 +245,7 @@ const probes: Record<string, () => Promise<Omit<Finding, "probe" | "at">>> = {
   },
 };
 
-const ORDER = ["token", "drand", "reporting", "webhooks", "payouts", "payout-id", "login", "jev"];
+const ORDER = ["token", "drand", "reporting", "webhooks", "payouts", "payout-id", "payout-note", "login", "jev"];
 
 async function main() {
   const requested = process.argv.slice(2).filter((arg) => arg !== "--");

@@ -78,6 +78,13 @@ export function LedgerPage({ id, claimId }: { id: string; claimId: string | null
                   ? "Checked in your browser: your payout's hash and its Merkle path lead to this program's commitment, made before payouts were sent. Keep this page: if anyone later added a payout or changed yours, it would no longer lead to the root you see here."
                   : "The proof does not lead to the published commitment. Contact the program administrator."}
                 {audited && " Your claim is in the audit sample."}
+                {inLedger && ledger.paypal && (
+                  <>
+                    {" "}
+                    In your PayPal account, the note on this payment carries <code>{ledger.paypal.anchor.slice(0, 40)}…</code>: the same digest,
+                    on PayPal's own record.
+                  </>
+                )}
               </p>
               <details>
                 <summary>See the proof</summary>

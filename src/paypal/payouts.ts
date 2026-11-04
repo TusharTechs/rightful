@@ -23,20 +23,25 @@ export type PayoutItem = {
 export type PayoutBatch = {
   batch_header: {
     payout_batch_id: string;
+    time_created?: string;
     batch_status: "PENDING" | "PROCESSING" | "SUCCESS" | "DENIED" | "CANCELED";
-    sender_batch_header?: { sender_batch_id?: string };
+    sender_batch_header?: { sender_batch_id?: string; email_subject?: string; email_message?: string };
   };
-  items?: { payout_item_id: string; transaction_status?: string; payout_item?: { sender_item_id?: string } }[];
+  items?: { payout_item_id: string; transaction_status?: string; payout_item?: { sender_item_id?: string; note?: string } }[];
 };
 
 export function createPayoutBatch(
   client: PayPalClient,
-  batch: { senderBatchId: string; emailSubject: string; items: PayoutItem[] },
+  batch: { senderBatchId: string; emailSubject: string; emailMessage?: string; items: PayoutItem[] },
 ): Promise<PayoutBatch> {
   return client.request<PayoutBatch>("POST", "/v1/payments/payouts", {
     idempotencyKey: batch.senderBatchId,
     body: {
-      sender_batch_header: { sender_batch_id: batch.senderBatchId, email_subject: batch.emailSubject },
+      sender_batch_header: {
+        sender_batch_id: batch.senderBatchId,
+        email_subject: batch.emailSubject,
+        ...(batch.emailMessage ? { email_message: batch.emailMessage } : {}),
+      },
       items: batch.items.map((item) => ({
         recipient_type: item.recipientType,
         receiver: item.receiver,
@@ -55,4 +60,12 @@ export function getPayoutBatch(client: PayPalClient, payoutBatchId: string, page
   return client.request<PayoutBatch>("GET", `/v1/payments/payouts/${encodeURIComponent(payoutBatchId)}`, {
     ...(page ? { query: { page: String(page.page), page_size: String(page.pageSize) } } : {}),
   });
+}
+
+/** One payout item as PayPal holds it, including the note it was sent with. */
+export function getPayoutItem(client: PayPalClient, payoutItemId: string) {
+  return client.request<{ payout_item_id: string; transaction_status?: string; payout_item?: { sender_item_id?: string; note?: string } }>(
+    "GET",
+    `/v1/payments/payouts-item/${encodeURIComponent(payoutItemId)}`,
+  );
 }

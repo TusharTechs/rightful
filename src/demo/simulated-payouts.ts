@@ -8,7 +8,7 @@
  */
 
 import type { Db } from "../db/db.ts";
-import type { PayoutItemState, PayoutsPort } from "../claims/payouts-port.ts";
+import type { BatchReadback, PayoutsPort } from "../claims/payouts-port.ts";
 
 const PREFIX = "SIM-";
 
@@ -17,7 +17,7 @@ export function simulatedPayouts(db: Db, batchSize: number): PayoutsPort {
     async send(request) {
       return { batchId: `${PREFIX}${request.senderBatchId}` };
     },
-    async items(batchId): Promise<PayoutItemState[]> {
+    async read(batchId): Promise<BatchReadback> {
       // Sender batch IDs are `<program>-<n>` (see distribute.ts); batch n carries the n-th slice.
       const match = /^SIM-(.+)-(\d+)$/.exec(batchId);
       if (!match) throw new Error(`not a simulated batch: ${batchId}`);
@@ -26,7 +26,8 @@ export function simulatedPayouts(db: Db, batchSize: number): PayoutsPort {
         `select id from claims where program_id = $1 and amount_cents is not null order by id offset $2 limit $3`,
         [programId, (Number(n) - 1) * batchSize, batchSize],
       );
-      return rows.map((row, i) => ({ claimId: row.id, payoutItemId: `${batchId}-${i + 1}`, status: "SUCCESS" }));
+      // No PayPal record exists for a simulated batch, so there is no message or note to read back.
+      return { emailMessage: null, timeCreated: null, items: rows.map((row, i) => ({ claimId: row.id, payoutItemId: `${batchId}-${i + 1}`, status: "SUCCESS" })) };
     },
   };
 }

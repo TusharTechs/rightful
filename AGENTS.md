@@ -48,7 +48,8 @@ PayPal Payouts to the exact account that signed in, and the round's randomness p
 - **Every money-moving call gets an idempotency key** derived from our own IDs (program, claim), never
   from the clock or a random value generated at retry time.
 - **Commit before paying.** The ledger is committed in the same transaction that fixes the share, before
-  any batch is sent. Nothing may change a committed payout.
+  any batch is sent. Nothing may change a committed payout. Every batch carries `ledgerAnchor(digest)` in
+  its `email_message` and every item's `note`; sync reads both back and records whether they match.
 - **AI never decides who is paid.** The investigator answers typed questions and the code turns them into
   a recommendation; denying or clearing a ring needs a person's decision.
 - **Read back from PayPal.** Treat our own state as a cache; confirm payouts with GETs. Webhooks can lag

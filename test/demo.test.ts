@@ -88,6 +88,7 @@ test("deciding every ring, then paying, goes through the ledger and never throug
 
   const ledger = await publicLedger(deps, program.id);
   assert.deepEqual(verifyLedger(ledger.terms, ledger.payouts, { commitment: ledger.commitment }), []);
+  assert.equal(ledger.paypal, null, "simulated payouts claim no PayPal record");
   await deps.db.close();
 });
 
