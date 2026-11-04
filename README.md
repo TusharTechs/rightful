@@ -12,6 +12,15 @@
 </p>
 
 <p align="center">
+  <a href="https://youtu.be/GRbuTdz5w2M">
+    <img src="https://img.youtube.com/vi/GRbuTdz5w2M/maxresdefault.jpg" alt="Watch the Rightful demo video (2:58)" width="720">
+  </a>
+  <br>
+  <sub>▶ <a href="https://youtu.be/GRbuTdz5w2M">Watch the demo video</a> (2:58, captions on)</sub>
+</p>
+
+<p align="center">
+  <a href="https://youtu.be/GRbuTdz5w2M">Demo video</a> ·
   <a href="https://rightful-web.onrender.com">Live app</a> ·
   <a href="#for-judges">For judges</a> ·
   <a href="#architecture">Architecture</a> ·
@@ -25,6 +34,7 @@
 
 | What | Link | Sign-in |
 | --- | --- | --- |
+| **Demo video** (2:58): the problem, the claimant and agent paths, the AI triage, commit-then-pay and verification | https://youtu.be/GRbuTdz5w2M | None |
 | **Live app** | https://rightful-web.onrender.com | None |
 | **Start here: a guided tour** of the whole app, step by step (about four minutes) | https://rightful-web.onrender.com/tour | None |
 | **Run a whole $2M settlement** as its administrator: triage 105 groups with AI memos, commit, pay, verify (~10 s to seed) | https://rightful-web.onrender.com → **Run a $2M program as the administrator** | None |
