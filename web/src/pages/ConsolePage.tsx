@@ -422,7 +422,11 @@ function RingDetail({ ring, reveal, disabled, onDecide, loadMembers }: Parameter
                 <tr key={m.id}>
                   <td className="nowrap">
                     {new Date(m.filedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
-                    {m.filedVia === "agent" && <span className="tag">agent</span>}
+                    {m.filedVia === "agent" && (
+                      <span className="tag" title={m.agentName ? `Filed by an assistant that called itself “${m.agentName}”, then confirmed by the person` : "Filed by an assistant, then confirmed by the person"}>
+                        agent{m.agentName ? `: ${m.agentName}` : ""}
+                      </span>
+                    )}
                     {!m.verified && <span className="tag warn">unverified</span>}
                   </td>
                   <td>{m.email}</td>

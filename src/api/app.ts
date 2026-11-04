@@ -27,6 +27,8 @@ export function createApp(deps: ClaimsDeps, options: AppOptions) {
   if (options.login) mountLogin(app, { claimant: claimantAfterLogin(deps), ...options.login }, () => deps.now().getTime());
   // The API uses no cookies outside /auth and /claim, so any origin may read public data and file.
   app.use("/api/*", cors({ origin: "*", allowHeaders: ["content-type", "authorization"], allowMethods: ["GET", "POST"] }));
+  // The MCP endpoint is public and cookie-free too, so browser-based MCP clients may call it.
+  app.use("/mcp", cors({ origin: "*", allowHeaders: ["content-type", "accept", "mcp-protocol-version", "mcp-session-id"], allowMethods: ["GET", "POST", "DELETE"] }));
 
   app.onError((err, c) => {
     if (err instanceof ClaimError) {

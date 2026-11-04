@@ -27,7 +27,7 @@ PayPal Payouts to the exact account that signed in, and the round's randomness p
 | `src/rings/investigate.ts`, `investigators.ts` | The ring investigator: a case file with stand-in labels (no personal data), three typed questions to TypeSafe Jev, a memo whose facts are computed in code, a fixed deny/review/clear rule. Live, record, or replay from `eval/investigator.jsonl` |
 | `src/claims/console.ts` | The administrator console's read: rings with memos and decisions, the share if paid now, and (demo only) the scoreboard against the synthetic truth |
 | `src/demo/` | The hosted demo: a per-visitor $2M program seeded from the synthetic generator (`seed.ts`, console tokens scoped to one demo program, pruning) and stateless simulated Payouts for demo programs only (`simulated-payouts.ts`) |
-| `src/api/` | Hono app (`app.ts`) and server (`main.ts`); claim pages, agent JSON and admin actions (`claims.ts`); Log in with PayPal (`login.ts`) |
+| `src/api/` | Hono app (`app.ts`) and server (`main.ts`); claim pages, agent JSON and admin actions (`claims.ts`); Log in with PayPal (`login.ts`); the claimant MCP server at `/mcp` (`mcp.ts`, tools pinned by `MCP_TOOLS`) |
 | `src/dev/fake-payouts.ts` | In-memory Payouts for `PAYPAL_MODE=fake` and tests |
 | `web/` | Web app (Vite + React): programs, the demo button, the administrator console at `/console/:program` (token in localStorage or a `#token=` link), the payout ledger at `/l/:program` (`?claim=` adds the claimant's receipt), and the in-browser verifier. Never import server code into it (type-only imports are fine) |
 | `scripts/open-program.ts`, `pay-program.ts` | Drive a running API: open a program and print its links; review, distribute and follow payouts |
@@ -50,6 +50,8 @@ PayPal Payouts to the exact account that signed in, and the round's randomness p
 - **Commit before paying.** The ledger is committed in the same transaction that fixes the share, before
   any batch is sent. Nothing may change a committed payout. Every batch carries `ledgerAnchor(digest)` in
   its `email_message` and every item's `note`; sync reads both back and records whether they match.
+- **Agents never bind, decide or pay.** The MCP server and agent JSON can only file, read status and
+  receipts. Do not add a tool or endpoint that confirms a claim or moves money for an agent.
 - **AI never decides who is paid.** The investigator answers typed questions and the code turns them into
   a recommendation; denying or clearing a ring needs a person's decision.
 - **Read back from PayPal.** Treat our own state as a cache; confirm payouts with GETs. Webhooks can lag

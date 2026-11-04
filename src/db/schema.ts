@@ -63,6 +63,8 @@ alter table programs add column if not exists audit_sample jsonb;
 -- more than a sandbox account holds), and keep each claim's ground truth for the console's scoreboard.
 alter table programs add column if not exists kind text not null default 'live' check (kind in ('live', 'demo'));
 alter table claims add column if not exists demo_truth text;
+-- The assistant that filed an agent claim, as it named itself (unverified; shown to the administrator).
+alter table claims add column if not exists agent_name text;
 -- The smallest group the ring detector reports. Lower is more sensitive: it also flags households,
 -- which the investigator and a person then clear.
 alter table programs add column if not exists ring_min_size integer not null default 5 check (ring_min_size >= 3);

@@ -32,6 +32,7 @@ import { distributeProgram, payoutProof, publicLedger, syncPayouts } from "../cl
 import { consoleView, ringMembers } from "../claims/console.ts";
 import { createDemoProgram } from "../demo/seed.ts";
 import type { LoginIntent } from "./login.ts";
+import { mountMcp } from "./mcp.ts";
 
 const BIND_COOKIE = "rf_bind";
 const BIND_TTL_S = 30 * 60;
@@ -49,6 +50,21 @@ export function mountClaims(app: Hono, deps: ClaimsDeps, options: ClaimRoutesOpt
   // Agent filings need no sign-in, so they are limited by network (/24) and overall. A claim filed
   // this way is never paid until a person binds it, but unlimited filings would flood review.
   const agentLimiter = rateLimiter({ perKey: 30, total: 600, windowMs: 3_600_000 });
+
+  /** Agent filing, shared by the JSON API and the MCP server: one path, one limit. */
+  const fileForAgent = async (programId: string, form: ReturnType<typeof formOf>, who: { ip: string; agentName?: string; base: string }) => {
+    if (!agentLimiter.allow(`${programId}|${networkOf(who.ip)}`, deps.now().getTime())) {
+      return { error: "rate_limited" as const, message: "Too many unconfirmed claims from this network for this program in the last hour. Have people confirm the ones already filed." };
+    }
+    const { claim, bindCode } = await fileClaim(deps, programId, form, { via: "agent", ip: who.ip, agentName: who.agentName });
+    const bindUrl = `${who.base}/claim/bind?claim=${encodeURIComponent(claim.id)}&code=${encodeURIComponent(bindCode!)}`;
+    return {
+      ...claimantView(claim),
+      humanConfirmationRequired: true as const,
+      bindUrl,
+      next: "Send bindUrl to the person this claim is for. Nothing is paid until they sign in with PayPal and confirm it, and payment goes only to that PayPal account.",
+    };
+  };
   let demoQueue: Promise<unknown> = Promise.resolve();
   const base = (c: Context) => options.publicBase ?? new URL(c.req.url).origin;
   const secure = (c: Context) => base(c).startsWith("https://");
@@ -140,12 +156,17 @@ export function mountClaims(app: Hono, deps: ClaimsDeps, options: ClaimRoutesOpt
       const { claim } = await fileClaim(deps, id(c), form, { via: "web", pass: body.pass, ip: clientIp(c) });
       return c.json(claimantView(claim), 201);
     }
-    if (!agentLimiter.allow(`${id(c)}|${networkOf(clientIp(c))}`, deps.now().getTime())) {
-      return c.json({ error: "rate_limited", message: "Too many unconfirmed claims from this network for this program in the last hour. Have people confirm the ones already filed." }, 429);
-    }
-    const { claim, bindCode } = await fileClaim(deps, id(c), form, { via: "agent", ip: clientIp(c) });
-    const bindUrl = `${base(c)}/claim/bind?claim=${encodeURIComponent(claim.id)}&code=${encodeURIComponent(bindCode!)}`;
-    return c.json({ ...claimantView(claim), bindUrl, next: "Send bindUrl to the person this claim is for. It is paid only after they sign in with PayPal and confirm it." }, 201);
+    const agentName = typeof body.agentName === "string" ? body.agentName : undefined;
+    const filed = await fileForAgent(id(c), form, { ip: clientIp(c), agentName, base: base(c) });
+    return "error" in filed ? c.json(filed, 429) : c.json(filed, 201);
+  });
+
+  mountMcp(app, deps, {
+    fileForAgent,
+    claimantView,
+    programView: (programId) => programView(deps, programId),
+    clientIp,
+    base,
   });
 
   app.get("/api/claims/:id", async (c) => c.json(claimantView(await getClaim(deps.db, id(c)))));
@@ -252,7 +273,7 @@ async function programView(deps: ClaimsDeps, programId: string) {
 }
 
 /** What a claimant (or their agent) may see: no personal data, no PayPal identifiers. */
-function claimantView(claim: ClaimRow) {
+export function claimantView(claim: ClaimRow) {
   return {
     id: claim.id,
     programId: claim.program_id,
@@ -271,7 +292,7 @@ function adminView(claim: ClaimRow) {
   return rest;
 }
 
-function formOf(body: Record<string, unknown>) {
+export function formOf(body: Record<string, unknown>) {
   const s = (v: unknown) => (typeof v === "string" ? v : "");
   return { email: s(body.email), address: s(body.address), narrative: s(body.narrative), device: s(body.device) };
 }
@@ -298,7 +319,7 @@ function rateLimiter(limits: { perKey: number; total: number; windowMs: number }
 }
 
 /** Render puts the client first in X-Forwarded-For. */
-function clientIp(c: Context): string {
+export function clientIp(c: Context): string {
   return c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ?? "";
 }
 

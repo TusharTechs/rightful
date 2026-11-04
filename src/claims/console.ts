@@ -180,6 +180,7 @@ export async function ringMembers(deps: ClaimsDeps, programId: string, ringId: s
     id: claim.id,
     status: claim.status,
     filedVia: claim.filed_via,
+    agentName: claim.agent_name,
     verified: claim.verified,
     humanTag: claim.human_tag,
     email: claim.email,

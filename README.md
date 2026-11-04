@@ -20,8 +20,10 @@ administrators either pay the fraud or freeze everyone while they investigate.
   per-program pseudonym, never the PayPal account ID (it is kept only encrypted, to pay), and a second
   claim from the same account is refused. The email and mailing address on the claim are kept for
   ring detection and shown to the administrator; the public ledger has neither.
-- **Agents can file; only people get paid.** An assistant can file a claim over the API. It waits,
-  unbound, until the person it is for signs in with PayPal and confirms it.
+- **Agents can file; only people get paid.** A person's assistant can file a claim over MCP
+  (`/mcp`: list programs, file, follow, fetch the receipt) or plain JSON. It has no tool to confirm,
+  decide or pay. The claim waits, unbound, until the person it is for signs in with PayPal and
+  confirms it. See [docs/agents.md](docs/agents.md).
 - **Rings are held, not paid.** Claims that share devices, inboxes, buildings, networks or a scripted
   story are grouped by a deterministic detector. An investigator (TypeSafe Jev, typed answers only)
   rates each group, the memo's facts are computed in code, and a person decides.

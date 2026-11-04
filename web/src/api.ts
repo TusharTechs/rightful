@@ -31,6 +31,7 @@ export type RingMember = {
   id: string;
   status: string;
   filedVia: "web" | "agent";
+  agentName?: string | null;
   verified: boolean | null;
   humanTag: string | null;
   email: string;

@@ -89,6 +89,7 @@ export type ClaimRow = {
   bound_at: Date | null;
   /** Demo programs only: the synthetic generator's truth, e.g. `ring:device-farm` or `genuine:household`. */
   demo_truth: string | null;
+  agent_name: string | null;
 };
 
 export class ClaimError extends Error {
@@ -134,7 +135,8 @@ export type ClaimForm = {
   device: string;
 };
 
-export type Filer = { via: "web"; pass: string; ip: string } | { via: "agent"; ip: string };
+/** An agent may name itself (e.g. "Acme Assistant"); the name is shown, never trusted. */
+export type Filer = { via: "web"; pass: string; ip: string } | { via: "agent"; ip: string; agentName?: string };
 
 export async function fileClaim(
   deps: ClaimsDeps,
@@ -149,10 +151,11 @@ export async function fileClaim(
 
   if (filer.via === "agent") {
     const bindCode = randomBytes(18).toString("base64url");
+    const agentName = filer.agentName?.replace(/\s+/g, " ").trim().slice(0, 80) || null;
     const [claim] = await deps.db.query<ClaimRow>(
-      `insert into claims (id, program_id, status, filed_via, bind_code_hash, email, address, network, device, narrative)
-       values ($1, $2, 'unbound', 'agent', $3, $4, $5, $6, $7, $8) returning *`,
-      [newId("clm"), program.id, hashCode(bindCode), fields.email, fields.address, network, fields.device, fields.narrative],
+      `insert into claims (id, program_id, status, filed_via, bind_code_hash, email, address, network, device, narrative, agent_name)
+       values ($1, $2, 'unbound', 'agent', $3, $4, $5, $6, $7, $8, $9) returning *`,
+      [newId("clm"), program.id, hashCode(bindCode), fields.email, fields.address, network, fields.device, fields.narrative, agentName],
     );
     return { claim: claim!, bindCode };
   }
